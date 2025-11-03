@@ -1,0 +1,72 @@
+/* Custom styles for Live Validation Dashboard */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+.min-vh-100 {
+    min-height: 100vh;
+}
+
+.card {
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 1rem;
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    font-weight: 600;
+}
+
+.table {
+    margin-bottom: 0;
+}
+
+.badge {
+    font-size: 0.8rem;
+    padding: 0.3rem 0.6rem;
+}
+
+#logsTable tr {
+    transition: background-color 0.3s ease;
+}
+
+#logsTable tr.new-log {
+    animation: highlight 1s ease;
+}
+
+@keyframes highlight {
+    0% {
+        background-color: #fff3cd;
+    }
+    100% {
+        background-color: transparent;
+    }
+}
+
+.log-passed {
+    color: #28a745;
+    font-weight: 600;
+}
+
+.log-failed {
+    color: #dc3545;
+    font-weight: 600;
+}
+
+#connectionStatus {
+    font-size: 0.85rem;
+}
+
+code {
+    background-color: #f8f9fa;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    color: #e83e8c;
+}
+
+.navbar-brand {
+    font-weight: 600;
+    font-size: 1.2rem;
+}

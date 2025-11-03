@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ app.name }} - Live Validation</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">Live Validation Dashboard</a>
+            <div>
+                <span class="text-light me-3">Welcome, {{ current_user.username }}</span>
+                <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-light btn-sm">Logout</a>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2>{{ app.name }}</h2>
+                <p class="text-muted mb-1">{{ app.description or 'No description' }}</p>
+                <p class="mb-0">
+                    <strong>App ID:</strong> 
+                    <code class="fs-6">{{ app.app_id }}</code>
+                    <button class="btn btn-sm btn-outline-secondary ms-2" onclick="copyAppId()">
+                        <small>Copy ID</small>
+                    </button>
+                </p>
+            </div>
+            <a href="{{ url_for('dashboard.index') }}" class="btn btn-secondary">← Back to Dashboard</a>
+        </div>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <!-- Stats Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <h6>Total Logs</h6>
+                        <h3 id="totalLogs">0</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <h6>Passed</h6>
+                        <h3 id="passedLogs">0</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-danger text-white">
+                    <div class="card-body">
+                        <h6>Failed</h6>
+                        <h3 id="failedLogs">0</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <h6>Success Rate</h6>
+                        <h3 id="successRate">0%</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- API Endpoint Info -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>API Endpoint</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>POST</strong> <code id="apiEndpoint">{{ request.url_root }}api/logs/{{ app.app_id }}</code></p>
+                <button class="btn btn-sm btn-outline-primary" onclick="copyToClipboard()">Copy URL</button>
+            </div>
+        </div>
+        
+        <!-- Validation Rules -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5>Validation Rules</h5>
+                <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#uploadRulesModal">
+                    Upload CSV Rules
+                </button>
+            </div>
+            <div class="card-body">
+                {% if app.validation_rules %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Event Name</th>
+                                    <th>Field Name</th>
+                                    <th>Data Type</th>
+                                    <th>Required</th>
+                                    <th>Pattern/Range</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for rule in app.validation_rules %}
+                                <tr>
+                                    <td>{{ rule.event_name }}</td>
+                                    <td>{{ rule.field_name }}</td>
+                                    <td>{{ rule.data_type }}</td>
+                                    <td>
+                                        {% if rule.is_required %}
+                                            <span class="badge bg-warning">Required</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Optional</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ rule.expected_pattern or rule.expected_value or '-' }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="alert alert-warning">
+                        No validation rules uploaded. Upload a CSV file to start validating logs.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Live Logs -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5>Live Validation Logs</h5>
+                <span class="badge bg-success" id="connectionStatus">Connecting...</span>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Event Name</th>
+                                <th>Status</th>
+                                <th>Message</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logsTable">
+                            <!-- Logs will be inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Upload Rules Modal -->
+    <div class="modal fade" id="uploadRulesModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Upload Validation Rules</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="{{ url_for('dashboard.upload_rules', app_id=app.app_id) }}" enctype="multipart/form-data">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="csvFile" class="form-label">CSV File</label>
+                            <input type="file" class="form-control" id="csvFile" name="csv_file" accept=".csv" required>
+                            <div class="form-text">
+                                <strong>Format:</strong> eventName, eventPayload, dataType<br>
+                                <strong>Important:</strong> Event name appears only once, then empty for same event<br>
+                                <strong>Example:</strong><br>
+                                <code>eventName,eventPayload,dataType</code><br>
+                                <code>user_login,user_id,integer</code><br>
+                                <code>,timestamp,date</code><br>
+                                <code>,device_type,text</code>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Upload</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/app_detail.js') }}"></script>
+    <script>
+        const APP_ID = "{{ app.app_id }}";
+    </script>
+</body>
+</html>

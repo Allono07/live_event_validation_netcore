@@ -1,0 +1,12 @@
+eventName,eventPayload,dataType
+user_login,user_id,integer
+,timestamp,date
+,device_type,text
+user_signup,email,text
+,age,integer
+,registration_date,date
+purchase_completed,amount,float
+,product_id,integer
+,transaction_date,date
+app_opened,session_id,text
+,app_version,text

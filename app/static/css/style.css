@@ -66,6 +66,44 @@ body {
     font-weight: 600;
 }
 
+/* Validation status colors */
+.status-valid {
+    background-color: #083913;
+    color: #155724;
+}
+
+.status-invalid {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.status-error {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.status-empty {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.status-missing {
+    background-color: #e2e3e5;
+    color: #383d41;
+}
+
+.status-extra-event {
+    background-color: #a7560b;
+    color: #dd8f11;
+    font-weight: 600;
+}
+
+.status-payload-from-extra {
+    background-color: #2d2301;
+    color: #ff9800;
+    background: #2d2301;
+}
+
 #connectionStatus {
     font-size: 0.85rem;
 }

@@ -237,6 +237,41 @@ class EventValidator:
         
         return results
     
+    @staticmethod
+    def _sort_validation_results(results: List[Dict]) -> List[Dict]:
+        """Sort validation results to group array elements by index.
+        
+        This ensures array items are shown in order: items[0].field1, items[0].field2, 
+        items[1].field1, items[1].field2 instead of mixed order.
+        
+        Sorting priority:
+        1. Non-array fields first (order preserved)
+        2. Array fields sorted by: array name, then by index, then field name
+        
+        Example:
+        Before: ['items[1].price', 'items[0].price', 'card_name', 'items[0].name']
+        After:  ['card_name', 'items[0].name', 'items[0].price', 'items[1].price']
+        """
+        def get_sort_key(result):
+            key = result.get('key', '')
+            
+            # Check if this is an array field like "items[0].price"
+            match = re.match(r"^(.+)\[(\d+)\]\.(.+)$", key)
+            if match:
+                array_name = match.group(1)  # "items"
+                index = int(match.group(2))   # 0, 1, 2, etc.
+                field_name = match.group(3)   # "price"
+                # Return tuple: (1=is_array, array_name, index, field_name)
+                return (1, array_name, index, field_name)
+            else:
+                # Non-array field
+                # Return tuple: (0=is_not_array, key, 0, '')
+                return (0, key, 0, '')
+        
+        # Sort using the key function
+        sorted_results = sorted(results, key=get_sort_key)
+        return sorted_results
+    
     def validate_event(self, event_name: str, payload: Dict[str, Any], 
                       validation_rules: List[Dict[str, Any]]) -> Tuple[str, List[Dict[str, Any]]]:
         """Validate an event payload against validation rules.
@@ -501,6 +536,10 @@ class EventValidator:
                 'validationStatus': status,
                 'comment': comment
             })
+        
+        # Sort results to group array elements by index
+        # This ensures items[0].field1, items[0].field2 appear before items[1].field1
+        results = self._sort_validation_results(results)
         
         # Determine overall status
         has_errors = any(

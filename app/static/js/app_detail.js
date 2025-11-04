@@ -12,6 +12,8 @@ function getStatusClass(status) {
     if (status === 'Payload value is Empty') return 'status-empty';
     if (status === 'Extra key present in the log') return 'status-extra';
     if (status === 'Payload not present in the log') return 'status-notpresent';
+    if (status === 'Extra event (not in sheet)') return 'status-extra-event';
+    if (status === 'Payload from extra event') return 'status-payload-from-extra';
     return '';
 }
 

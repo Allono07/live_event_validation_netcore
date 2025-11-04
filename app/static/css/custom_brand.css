@@ -21,3 +21,14 @@
 .status-empty{ background-color:#fff3cd !important; color:#856404 !important; font-weight:bold; }
 .status-extra{ background-color:#d1ecf1 !important; color:#0c5460 !important; font-weight:bold; }
 .status-notpresent{ background-color:#e2e3e5 !important; color:#383d41 !important; font-weight:bold; }
+.status-extra-event {
+    background-color: #e3832a !important;
+    color: #332207;
+    font-weight: 600;
+}
+
+.status-payload-from-extra {
+    background-color: #2d2301;
+    color: #ff9800;
+    background: #2d2301;
+}

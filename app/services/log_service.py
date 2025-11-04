@@ -182,3 +182,18 @@ class LogService:
         if not app:
             return []
         return self.log_repo.get_distinct_event_names(app.id)
+    
+    def get_fully_valid_events(self, app_id: str, hours: int = 24) -> List[str]:
+        """Get list of events where the latest instance has all valid fields.
+        
+        Args:
+            app_id: Application ID
+            hours: Time window in hours (default 24)
+            
+        Returns:
+            List of event names that are fully valid in their latest instance
+        """
+        app = self.app_repo.get_by_app_id(app_id)
+        if not app:
+            return []
+        return self.log_repo.get_fully_valid_events(app.id, hours)

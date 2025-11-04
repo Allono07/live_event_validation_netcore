@@ -517,18 +517,23 @@ function updateCoverage() {
                 }
             }
             
-            // Update fully valid events
-            const fullyValid = calculateFullyValidEvents();
-            const fullyValidList = document.getElementById('fullyValidEventsList');
-            if (fullyValidList) {
-                if (fullyValid.length > 0) {
-                    fullyValidList.innerHTML = fullyValid
-                        .map(e => `<span class="badge bg-success me-1 mb-1">${e}</span>`)
-                        .join('');
-                } else {
-                    fullyValidList.innerHTML = '<small class="text-muted">No fully valid events yet</small>';
-                }
-            }
+            // Fetch fully valid events from backend API
+            fetch(`/app/${APP_ID}/fully-valid-events`)
+                .then(response => response.json())
+                .then(fullyValidData => {
+                    const fullyValid = fullyValidData.fully_valid_events || [];
+                    const fullyValidList = document.getElementById('fullyValidEventsList');
+                    if (fullyValidList) {
+                        if (fullyValid.length > 0) {
+                            fullyValidList.innerHTML = fullyValid
+                                .map(e => `<span class="badge bg-success me-1 mb-1">${e}</span>`)
+                                .join('');
+                        } else {
+                            fullyValidList.innerHTML = '<small class="text-muted">No fully valid events yet</small>';
+                        }
+                    }
+                })
+                .catch(error => console.error('Error fetching fully valid events:', error));
         })
         .catch(error => console.error('Error updating coverage:', error));
 }

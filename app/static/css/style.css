@@ -66,7 +66,7 @@ body {
     font-weight: 600;
 }
 
-/* Validation status colors */
+/* Validation status colors
 .status-valid {
     background-color: #083913;
     color: #155724;
@@ -102,7 +102,7 @@ body {
     background-color: #2d2301;
     color: #ff9800;
     background: #2d2301;
-}
+} */
 
 #connectionStatus {
     font-size: 0.85rem;

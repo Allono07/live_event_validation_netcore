@@ -39,26 +39,30 @@ class LogRepository(BaseRepository[LogEntry]):
         
         Stats breakdown:
         - total: Total unique events (by event_name) that have been captured
-        - valid: Unique events where ALL instances have ALL fields passed validation
-        - invalid: Unique events where at least ONE instance has at least ONE field failed
-        - error: Events where validation threw an error or had issues
+        - valid: Unique events where the LATEST instance has ALL fields passed validation
+        - invalid: Unique events where the LATEST instance has at least ONE field failed
+        - error: Events where the LATEST instance had validation errors
         
-        CRITICAL: An event is "Passed" only if EVERY instance of it has EVERY field valid.
-        If you have 10 UserLogin events and even 1 has a field that's invalid, UserLogin is "Failed".
+        NEW BEHAVIOR: An event is "Passed" if the MOST RECENT instance is fully valid.
+        This allows events to "recover" after payload issues are fixed.
         """
         since = datetime.utcnow() - timedelta(hours=hours)
         
-        # Get all logs in the time window
+        # Get all logs in the time window, ordered by created_at DESC (newest first)
         logs = db.session.query(LogEntry).filter(
             LogEntry.app_id == app_id,
             LogEntry.created_at >= since
-        ).all()
+        ).order_by(LogEntry.created_at.desc()).all()
         
-        # Group logs by event_name to track the best and worst status for each event
-        event_statuses = {}  # event_name -> list of (validation_status, all_fields_valid)
+        # Track the LATEST (most recent) instance of each event
+        latest_event_status = {}  # event_name -> (validation_status, all_fields_valid)
         
         for log in logs:
             event_name = log.event_name
+            
+            # Skip if we've already seen a more recent instance of this event
+            if event_name in latest_event_status:
+                continue
             
             # Check if all fields are valid for this specific log entry
             all_fields_valid = False
@@ -71,39 +75,27 @@ class LogRepository(BaseRepository[LogEntry]):
                 else:
                     all_fields_valid = True
             
-            # Initialize if not seen before
-            if event_name not in event_statuses:
-                event_statuses[event_name] = {
-                    'has_error': False,
-                    'has_invalid': False,
-                    'all_instances_fully_valid': True
-                }
-            
-            # Update the tracking for this event
-            if log.validation_status == 'error':
-                event_statuses[event_name]['has_error'] = True
-            elif log.validation_status == 'invalid':
-                event_statuses[event_name]['has_invalid'] = True
-                event_statuses[event_name]['all_instances_fully_valid'] = False
-            elif log.validation_status == 'valid':
-                if not all_fields_valid:
-                    event_statuses[event_name]['has_invalid'] = True
-                    event_statuses[event_name]['all_instances_fully_valid'] = False
+            # Store the latest instance's status
+            latest_event_status[event_name] = {
+                'validation_status': log.validation_status,
+                'all_fields_valid': all_fields_valid
+            }
         
-        # Now categorize each unique event based on its worst status
+        # Now categorize each unique event based on its LATEST status
         total_count = 0
         valid_count = 0
         invalid_count = 0
         error_count = 0
         
-        for event_name, status_info in event_statuses.items():
+        for event_name, status_info in latest_event_status.items():
             total_count += 1
             
-            if status_info['has_error']:
+            if status_info['validation_status'] == 'error':
                 error_count += 1
-            elif status_info['has_invalid'] or not status_info['all_instances_fully_valid']:
+            elif status_info['validation_status'] == 'invalid' or not status_info['all_fields_valid']:
                 invalid_count += 1
             else:
+                # validation_status == 'valid' AND all_fields_valid == True
                 valid_count += 1
         
         return {
@@ -138,6 +130,67 @@ class LogRepository(BaseRepository[LogEntry]):
             LogEntry.event_name.isnot(None)
         ).distinct().all()
         return [r[0] for r in results if r[0]]
+    
+    def get_fully_valid_events(self, app_id: int, hours: int = 24) -> List[str]:
+        """Get list of events where the latest instance has all fields valid.
+        
+        Returns list of event names where:
+        1. The event has validation rules (is in the CSV)
+        2. The most recent instance is fully valid
+        3. The event is a user event (eventId=0)
+        """
+        from datetime import datetime, timedelta
+        
+        since = datetime.utcnow() - timedelta(hours=hours)
+        
+        # Get all logs in the time window, ordered by created_at DESC (newest first)
+        logs = db.session.query(LogEntry).filter(
+            LogEntry.app_id == app_id,
+            LogEntry.created_at >= since
+        ).order_by(LogEntry.created_at.desc()).all()
+        
+        # Track the LATEST instance of each event
+        latest_event_status = {}
+        
+        for log in logs:
+            event_name = log.event_name
+            
+            # Skip if we've already seen a more recent instance
+            if event_name in latest_event_status:
+                continue
+            
+            # Skip system events (eventId != 0)
+            # Check if this is a user event by looking at validation_results
+            is_user_event = False
+            if log.validation_results and isinstance(log.validation_results, list):
+                # Check if event has validation rules (not an "extra event")
+                # Events with rules will have validation_results, system events won't
+                has_validation_rules = any(
+                    result.get('validationStatus') not in ['Extra event (not in sheet)', 'Payload from extra event']
+                    for result in log.validation_results
+                )
+                if has_validation_rules:
+                    is_user_event = True
+            
+            # Skip if not a user event with validation rules
+            if not is_user_event:
+                continue
+            
+            # Check if all fields are valid for this log
+            all_fields_valid = False
+            if log.validation_status == 'valid':
+                if log.validation_results and isinstance(log.validation_results, list):
+                    all_fields_valid = all(
+                        result.get('validationStatus') == 'Valid'
+                        for result in log.validation_results
+                    )
+                else:
+                    all_fields_valid = True
+            
+            latest_event_status[event_name] = all_fields_valid
+        
+        # Return only events where latest instance is fully valid
+        return [event_name for event_name, is_valid in latest_event_status.items() if is_valid]
     
     def _compute_payload_hash(self, payload: dict) -> str:
         """Compute hash of payload (eventName + payload sub-object only, ignore metadata).

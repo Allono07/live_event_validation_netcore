@@ -239,6 +239,20 @@ def get_event_names(app_id):
         return jsonify({'error': str(e)}), 500
 
 
+@dashboard_bp.route('/app/<app_id>/fully-valid-events', methods=['GET'])
+@login_required
+def get_fully_valid_events(app_id):
+    """Get list of events where the latest instance has all valid fields (AJAX endpoint)."""
+    if not app_service.user_owns_app(current_user.id, app_id):
+        return jsonify({'error': 'Access denied'}), 403
+    
+    try:
+        fully_valid_events = log_service.get_fully_valid_events(app_id, hours=24)
+        return jsonify({'fully_valid_events': fully_valid_events})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @dashboard_bp.route('/app/<app_id>/filter', methods=['POST', 'OPTIONS'])
 @login_required
 def filter_results(app_id):

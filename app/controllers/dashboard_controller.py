@@ -5,9 +5,11 @@ from werkzeug.utils import secure_filename
 import os
 import csv
 import io
+import json
 from app.services.app_service import AppService
 from app.services.validation_service import ValidationService
 from app.services.log_service import LogService
+from config.database import db
 
 dashboard_bp = Blueprint('dashboard', __name__)
 app_service = AppService()
@@ -394,81 +396,116 @@ def download_validation_report(app_id):
 @dashboard_bp.route('/app/<app_id>/download-valid-events', methods=['POST'])
 @login_required
 def download_valid_events(app_id):
-    """Download valid events report as CSV (tab-delimited).
+    """Download validation summary report as CSV.
     
-    Expects JSON body with:
-    - results: List of all validation results
+    Returns CSV with one row per unique user event (eventId=0) showing:
+    - Event Name
+    - Latest Timestamp
+    - Field Name
+    - Value
+    - Expected Type
+    - Received Type
+    - Validation Status (detailed message)
+    - Latest Log Payload (full JSON)
     
-    Returns CSV with columns:
-    - eventName, eventPayload, dataType, Logs
-    
-    Only includes events where ALL payloads are valid.
-    For invalid events, shows "need to validate further" in Logs column.
+    Only shows the most recent instance of each user event.
     """
     if not app_service.user_owns_app(current_user.id, app_id):
         return jsonify({'error': 'Access denied'}), 403
     
     try:
-        data = request.get_json()
-        results = data.get('results', [])
+        # Get app
+        app = app_service.get_app_by_id(app_id)
+        if not app:
+            return jsonify({'error': 'App not found'}), 404
         
-        # Group results by eventName to check if ALL payloads are valid
-        from collections import defaultdict
-        event_payloads = defaultdict(list)
-        for r in results:
-            event_payloads[r['eventName']].append(r['validationStatus'])
+        # Get recent logs (last 24 hours)
+        from datetime import datetime, timedelta
+        since = datetime.utcnow() - timedelta(hours=24)
         
-        # Only include events where ALL payloads are valid
-        fully_valid_events = [
-            event for event, statuses in event_payloads.items()
-            if all(status == 'Valid' for status in statuses)
-        ]
+        from app.repositories.log_repository import LogRepository
+        log_repo = LogRepository()
         
-        # Group by eventName to get all events
-        event_groups = {}
-        for result in results:
-            event_name = result['eventName']
-            if event_name not in event_groups:
-                event_groups[event_name] = []
-            event_groups[event_name].append(result)
+        # Get all logs ordered by newest first
+        logs = db.session.query(log_repo.model).filter(
+            log_repo.model.app_id == app.id,
+            log_repo.model.created_at >= since
+        ).order_by(log_repo.model.created_at.desc()).all()
         
-        # Create CSV content (tab-delimited as per beta2.py)
+        # Track latest instance of each event
+        event_summary = {}  # event_name -> log entry
+        
+        for log in logs:
+            event_name = log.event_name
+            
+            # Skip if we already have this event (we want the latest only)
+            if event_name in event_summary:
+                continue
+            
+            # Check if this is a user event (eventId = 0)
+            # Default to True (assume user event unless proven otherwise)
+            is_user_event = True
+            
+            # Check validation_results for eventId
+            if log.validation_results and isinstance(log.validation_results, list):
+                for result in log.validation_results:
+                    if result.get('key', '').lower() == 'eventid':
+                        event_id = result.get('value')
+                        # If eventId is not 0, it's a system event
+                        if event_id != 0 and event_id != '0':
+                            is_user_event = False
+                        break
+            
+            # Also check payload as backup
+            if log.payload and isinstance(log.payload, dict):
+                event_id = log.payload.get('eventId') or log.payload.get('eventid')
+                if event_id is not None and event_id != 0 and event_id != '0':
+                    is_user_event = False
+            
+            # Skip non-user events
+            if not is_user_event:
+                continue
+            
+            # Store the latest user event
+            event_summary[event_name] = log
+        
+        # Create CSV content
         output = io.StringIO()
-        writer = csv.writer(output, delimiter='\t')
+        fieldnames = ['Event Name', 'Latest Timestamp', 'Field Name', 'Value', 'Expected Type', 'Received Type', 'Validation Status', 'Latest Log Payload']
+        writer = csv.DictWriter(output, fieldnames=fieldnames)
+        writer.writeheader()
         
-        # Write header
-        writer.writerow(['eventName', 'eventPayload', 'dataType', 'Logs'])
-        
-        # Write data rows for all events
-        all_events = list(event_groups.keys())
-        for event_name in all_events:
-            event_results = event_groups.get(event_name, [])
+        # Write rows for each event
+        for event_name in sorted(event_summary.keys()):
+            log = event_summary[event_name]
+            timestamp = log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else ''
+            payload_json = json.dumps(log.payload) if log.payload else '{}'
             
-            # Check if this event is fully valid
-            is_fully_valid = event_name in fully_valid_events
-            
-            # Write first row with event name and first field
-            if event_results:
-                first_result = event_results[0]
-                
-                # Determine what to put in the Logs column
-                logs_content = "All validations passed" if is_fully_valid else "need to validate further"
-                
-                writer.writerow([
-                    first_result['eventName'],
-                    first_result['key'],
-                    first_result['expectedType'],
-                    logs_content
-                ])
-                
-                # Write remaining rows for this event (without event name and log entry)
-                for result in event_results[1:]:
-                    writer.writerow([
-                        "",  # Empty eventName for subsequent rows
-                        result['key'],
-                        result['expectedType'],
-                        ""  # Empty Logs for subsequent rows
-                    ])
+            # Get validation results
+            if log.validation_results and isinstance(log.validation_results, list):
+                for idx, result in enumerate(log.validation_results):
+                    writer.writerow({
+                        'Event Name': event_name if idx == 0 else '',  # Only show event name on first row
+                        'Latest Timestamp': timestamp if idx == 0 else '',
+                        'Field Name': result.get('key', ''),
+                        'Value': result.get('value', ''),
+                        'Expected Type': result.get('expectedType', ''),
+                        'Received Type': result.get('receivedType', ''),
+                        'Validation Status': result.get('validationStatus', ''),
+                        'Latest Log Payload': payload_json if idx == 0 else ''  # Only show payload on first row
+                    })
+            else:
+                # No validation results, write one row with event info
+                writer.writerow({
+                    'Event Name': event_name,
+                    'Latest Timestamp': timestamp,
+                    'Field Name': '',
+                    'Value': '',
+                    'Expected Type': '',
+                    'Received Type': '',
+                    'Validation Status': log.validation_status or '',
+                    'Latest Log Payload': payload_json
+                })
         
         # Create response
         output.seek(0)
@@ -476,7 +513,7 @@ def download_valid_events(app_id):
             output.getvalue(),
             mimetype='text/csv',
             headers={
-                'Content-Disposition': f'attachment; filename=valid_events_report_{app_id}.csv',
+                'Content-Disposition': f'attachment; filename=validation_summary_{app_id}.csv',
                 'Content-Type': 'text/csv; charset=utf-8'
             }
         )

@@ -664,35 +664,28 @@ function clearFilters() {
 }
 
 // Download valid events report
+// Download validation summary (one row per event with latest status and payload)
 function downloadValidEvents() {
-    if (allValidationResults.length === 0) {
-        alert('No validation results to download');
-        return;
-    }
-    
     fetch(`/app/${APP_ID}/download-valid-events`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            results: allValidationResults
-        })
+        }
     })
     .then(response => response.blob())
     .then(blob => {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `valid_events_report_${APP_ID}.csv`;
+        a.download = `validation_summary_${APP_ID}.csv`;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
         a.remove();
     })
     .catch(error => {
-        console.error('Error downloading valid events:', error);
-        alert('Error downloading valid events');
+        console.error('Error downloading validation summary:', error);
+        alert('Error downloading validation summary');
     });
 }
 

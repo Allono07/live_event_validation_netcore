@@ -5,7 +5,6 @@ from config.database import db
 
 class ValidationRule(db.Model):
     """Validation rules for event payloads."""
-    
     __tablename__ = 'validation_rules'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -14,6 +13,7 @@ class ValidationRule(db.Model):
     field_name = db.Column(db.String(200), nullable=False)
     data_type = db.Column(db.String(50), nullable=False)  # text, integer, float, date, boolean
     is_required = db.Column(db.Boolean, default=False)
+    expected_pattern = db.Column(db.String(500), nullable=True)  # Pattern or range validation
     condition = db.Column(db.JSON, nullable=True)  # Conditional validation rules
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -35,6 +35,7 @@ class ValidationRule(db.Model):
             'field_name': self.field_name,
             'data_type': self.data_type,
             'is_required': self.is_required,
+            'expected_pattern': self.expected_pattern,
             'condition': self.condition,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }

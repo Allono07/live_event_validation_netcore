@@ -6,7 +6,9 @@
     <title>{{ app.name }} - Live Validation</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom_brand.css') }}">
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <!-- styles moved to app/static/css/style.css for project-wide application -->
 </head>
 <body>
     <nav class="navbar navbar-dark bg-dark">
@@ -51,8 +53,9 @@
             <div class="col-md-3">
                 <div class="card bg-primary text-white">
                     <div class="card-body">
-                        <h6>Total Logs</h6>
+                        <h6>Total User Events</h6>
                         <h3 id="totalLogs">0</h3>
+                        <small>eventId!= 0</small>
                     </div>
                 </div>
             </div>
@@ -88,83 +91,243 @@
                 <h5>API Endpoint</h5>
             </div>
             <div class="card-body">
+                <!-- Filters moved into the table header for per-column dropdowns -->
                 <p><strong>POST</strong> <code id="apiEndpoint">{{ request.url_root }}api/logs/{{ app.app_id }}</code></p>
                 <button class="btn btn-sm btn-outline-primary" onclick="copyToClipboard()">Copy URL</button>
             </div>
         </div>
-        
+
+        <!-- Coverage Info -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5>Event Coverage</h5>
+                <small class="text-muted">Shows how many events from the rule sheet have been captured</small>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-sm-3">
+                        <div class="h6">Captured</div>
+                        <div class="fs-4" id="coveredCount">0</div>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="h6">Missing</div>
+                        <div class="fs-4 text-danger" id="missingCount">0</div>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="h6">Total in Sheet</div>
+                        <div class="fs-4" id="totalSheetCount">0</div>
+                    </div>
+                    <!-- <div class="col-sm-3">
+                        <div class="h6">Formula</div>
+                        <div class="small text-muted">
+                            <strong>Captured + Missing = Total</strong><br>
+                            <span style="font-size: 0.85em;">Coverage only includes events from the validation rules sheet</span>
+                        </div>
+                    </div> -->
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-md-6">
+                        <strong>Missing events</strong>
+                        <ul id="missingEventsList" class="small"></ul>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Fully Valid Events</strong>
+                        <div class="small">
+                            <div id="fullyValidEventsList" style="max-height: 150px; overflow-y: auto;">
+                                <!-- Fully valid events will be listed here -->
+                            </div>
+                            <div class="mt-2">
+                                <!-- <small class="text-muted">
+                                    Events where ALL payload validations passed
+                                </small> -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+            <!-- Live Logs with Tabs -->
+        <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                <h5>Live Validation Results</h5>
+                <div class="d-flex align-items-center">
+                    <div class="me-3">
+                        <button class="btn btn-success btn-sm me-2" id="downloadResults">Download All Results</button>
+                        <button class="btn btn-info btn-sm me-2" id="downloadValidEvents">Download Valid Events</button>
+                        <button class="btn btn-sm btn-outline-secondary me-2" id="applyFiltersBtn">Apply Filters</button>
+                        <button class="btn btn-sm btn-outline-secondary me-2" id="clearFiltersBtn">Clear Filters</button>
+                        <button class="btn btn-danger btn-sm me-2" id="deleteAllLogs">Delete All Events</button>
+                    </div>
+                    <div>
+                        <span class="badge bg-success" id="connectionStatus">Connecting...</span>
+                    </div>
+                </div>
+                </div>
+            <div class="card-body">
+                <!-- Tabs -->
+                <ul class="nav nav-tabs" id="logsTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="user-events-tab" data-bs-toggle="tab" data-bs-target="#user-events" type="button" role="tab">
+                            User Events (eventId= 0) <span class="badge bg-primary ms-2" id="userEventsCount">0</span>
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="system-events-tab" data-bs-toggle="tab" data-bs-target="#system-events" type="button" role="tab">
+                            System Events (eventId ≠ 0) <span class="badge bg-secondary ms-2" id="systemEventsCount">0</span>
+                        </button>
+                    </li>
+                </ul>
+                
+                <div class="tab-content mt-3" id="logsTabContent">
+                    <!-- User Events Tab -->
+                    <div class="tab-pane fade show active" id="user-events" role="tabpanel">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>Event Name</th>
+                                        <th>Field Name</th>
+                                        <th>Value</th>
+                                        <th>Expected Type</th>
+                                        <th>Received Type</th>
+                                        <th>Status</th>
+                                    </tr>
+                                    <tr class="filters-row">
+                                        <th></th>
+                                        <th>
+                                            <div class="d-flex">
+                                                <input id="filterEventSearch" class="form-control form-control-sm me-1" placeholder="Search event..." />
+                                                <div class="dropdown">
+                                                    <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" id="filterEventDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false">
+                                                        Select events
+                                                    </button>
+                                                    <div class="dropdown-menu p-2" aria-labelledby="filterEventDropdownBtn" style="max-height:200px;overflow:auto;" id="filterEventContainer">
+                                                        <!-- checkboxes populated here -->
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </th>
+                                        <th>
+                                            <div class="dropdown">
+                                                <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" id="filterFieldDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false">
+                                                    Select fields
+                                                </button>
+                                                <div class="dropdown-menu p-2" aria-labelledby="filterFieldDropdownBtn" style="max-height:200px;overflow:auto;" id="filterFieldContainer">
+                                                    <!-- checkboxes populated here -->
+                                                </div>
+                                            </div>
+                                        </th>
+                                        <th>
+                                            <input id="filterValueInput" class="form-control form-control-sm" placeholder="search value" />
+                                        </th>
+                                        <th>
+                                            <div class="dropdown">
+                                                <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" id="filterExpectedDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false">
+                                                    Expected types
+                                                </button>
+                                                <div class="dropdown-menu p-2" aria-labelledby="filterExpectedDropdownBtn" style="max-height:160px;overflow:auto;" id="filterExpectedContainer">
+                                                </div>
+                                            </div>
+                                        </th>
+                                        <th>
+                                            <div class="dropdown">
+                                                <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" id="filterReceivedDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false">
+                                                    Received types
+                                                </button>
+                                                <div class="dropdown-menu p-2" aria-labelledby="filterReceivedDropdownBtn" style="max-height:160px;overflow:auto;" id="filterReceivedContainer">
+                                                </div>
+                                            </div>
+                                        </th>
+                                        <th>
+                                            <div class="dropdown">
+                                                <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" id="filterStatusDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false">
+                                                    Status
+                                                </button>
+                                                <div class="dropdown-menu p-2" aria-labelledby="filterStatusDropdownBtn" style="max-height:160px;overflow:auto;" id="filterStatusContainer">
+                                                </div>
+                                            </div>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody id="userLogsTable">
+                                    <!-- User event validation results will be inserted here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- System Events Tab -->
+                    <div class="tab-pane fade" id="system-events" role="tabpanel">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>Event Name</th>
+                                        <th>Event ID</th>
+                                        <th>Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="systemLogsTable">
+                                    <!-- System event logs will be inserted here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3 text-center">
+                    <button id="loadMoreBtn" class="btn btn-sm btn-outline-primary" style="display:none;">Load more</button>
+                </div>
+            </div>
+        </div>
         <!-- Validation Rules -->
         <div class="card mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5>Validation Rules</h5>
-                <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#uploadRulesModal">
-                    Upload CSV Rules
-                </button>
+                <div>
+                    <button class="btn btn-sm btn-outline-secondary me-2" data-bs-toggle="collapse" data-bs-target="#rulesCollapse" aria-expanded="false" aria-controls="rulesCollapse">
+                        Toggle Rules
+                    </button>
+                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#uploadRulesModal">
+                        Upload CSV Rules
+                    </button>
+                </div>
             </div>
-            <div class="card-body">
-                {% if app.validation_rules %}
-                    <div class="table-responsive">
-                        <table class="table table-sm">
-                            <thead>
-                                <tr>
-                                    <th>Event Name</th>
-                                    <th>Field Name</th>
-                                    <th>Data Type</th>
-                                    <th>Required</th>
-                                    <th>Pattern/Range</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for rule in app.validation_rules %}
-                                <tr>
-                                    <td>{{ rule.event_name }}</td>
-                                    <td>{{ rule.field_name }}</td>
-                                    <td>{{ rule.data_type }}</td>
-                                    <td>
-                                        {% if rule.is_required %}
-                                            <span class="badge bg-warning">Required</span>
-                                        {% else %}
-                                            <span class="badge bg-secondary">Optional</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>{{ rule.expected_pattern or rule.expected_value or '-' }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                {% else %}
-                    <div class="alert alert-warning">
-                        No validation rules uploaded. Upload a CSV file to start validating logs.
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-        
-        <!-- Live Logs -->
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5>Live Validation Logs</h5>
-                <span class="badge bg-success" id="connectionStatus">Connecting...</span>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-sm">
-                        <thead>
-                            <tr>
-                                <th>Timestamp</th>
-                                <th>Event Name</th>
-                                <th>Status</th>
-                                <th>Message</th>
-                            </tr>
-                        </thead>
-                        <tbody id="logsTable">
-                            <!-- Logs will be inserted here -->
-                        </tbody>
-                    </table>
+            <div id="rulesCollapse" class="collapse">
+                <div class="card-body">
+                    {% if app.validation_rules %}
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Event Name</th>
+                                        <th>Field Name</th>
+                                        <th>Data Type</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for rule in app.validation_rules %}
+                                    <tr>
+                                        <td>{{ rule.event_name }}</td>
+                                        <td>{{ rule.field_name }}</td>
+                                        <td>{{ rule.data_type }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-warning">
+                            No validation rules uploaded. Upload a CSV file to start validating logs.
+                        </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
+        
+    
     </div>
     
     <!-- Upload Rules Modal -->
@@ -181,7 +344,7 @@
                             <label for="csvFile" class="form-label">CSV File</label>
                             <input type="file" class="form-control" id="csvFile" name="csv_file" accept=".csv" required>
                             <div class="form-text">
-                                <strong>Format:</strong> eventName, eventPayload, dataType<br>
+                                <strong>Format:</strong> eventName,eventPayload,dataType<br>
                                 <strong>Important:</strong> Event name appears only once, then empty for same event<br>
                                 <strong>Example:</strong><br>
                                 <code>eventName,eventPayload,dataType</code><br>

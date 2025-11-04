@@ -32,6 +32,17 @@ body {
     transition: background-color 0.3s ease;
 }
 
+#logsTable tr.event-header {
+    background-color: #e9ecef;
+    padding: 0 !important;
+}
+
+#logsTable tr.event-header td {
+    padding: 0.35rem 0.5rem !important;
+    font-size: 0.9rem;
+    border: none;
+}
+
 #logsTable tr.new-log {
     animation: highlight 1s ease;
 }
@@ -69,4 +80,40 @@ code {
 .navbar-brand {
     font-weight: 600;
     font-size: 1.2rem;
+}
+
+/* Smaller checkboxes used in filter dropdowns */
+.filter-checkbox {
+    /* Use explicit small square size for checkboxes for consistent rendering */
+    width: 14px;
+    height: 14px;
+    padding: 0;
+    margin-right: 0.35rem;
+    vertical-align: middle;
+    border-radius: 2px; /* keep slightly squared */
+    /* Ensure native appearance remains a checkbox where supported */
+    -webkit-appearance: checkbox;
+    appearance: checkbox;
+    display: inline-block;
+}
+
+/* Slightly smaller labels next to the compact checkboxes */
+.filter-checkbox + .form-check-label {
+    font-size: 0.85rem;
+    margin-left: 0.15rem;
+}
+/* Ensure checkbox and label sit on the same line nicely inside dropdowns */
+.dropdown .form-check {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.08rem 0; /* small vertical spacing between rows */
+}
+.dropdown .form-check .form-check-label {
+    margin: 0; /* remove default label margin so it sits inline */
+}
+.form-check .form-check-input {
+    float: left;
+    margin-left: -3.5em;
+    margin-right: -48.4px;
 }

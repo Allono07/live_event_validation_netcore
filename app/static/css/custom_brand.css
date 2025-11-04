@@ -1,0 +1,23 @@
+/* Custom brand overrides for Live Validation Dashboard
+   Primary: #230f2e, Accent: #e35502
+   This file intentionally contains only overrides so it can safely be added in addition to existing styles.
+*/
+:root {
+  --brand-primary: #230f2e;
+  --brand-accent: #e35502;
+}
+
+.navbar { background-color: var(--brand-primary) !important; }
+.navbar .navbar-brand, .navbar .text-light { color: #fff !important; }
+.btn-primary { background-color: var(--brand-accent) !important; border-color: var(--brand-accent) !important; color: #fff !important; }
+.btn-outline-primary { color: var(--brand-accent) !important; border-color: var(--brand-accent) !important; }
+.badge.bg-primary { background-color: var(--brand-primary) !important; }
+.card.bg-primary { background-color: var(--brand-primary) !important; }
+.event-header td { background: linear-gradient(90deg, rgba(35,15,46,0.05), #ffffff); border-bottom: 1px solid rgba(35,15,46,0.06); }
+.event-header strong { color: var(--brand-accent); }
+.filters-row select, .filters-row input { min-width: 120px; }
+.status-valid{ background-color:#d4edda !important; color:#155724 !important; font-weight:bold; }
+.status-invalid{ background-color:#f8d7da !important; color:#721c24 !important; font-weight:bold; }
+.status-empty{ background-color:#fff3cd !important; color:#856404 !important; font-weight:bold; }
+.status-extra{ background-color:#d1ecf1 !important; color:#0c5460 !important; font-weight:bold; }
+.status-notpresent{ background-color:#e2e3e5 !important; color:#383d41 !important; font-weight:bold; }

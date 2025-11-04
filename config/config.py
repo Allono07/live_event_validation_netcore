@@ -7,7 +7,7 @@ class Config:
     """Base configuration."""
     
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///validation_dashboard.db'
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'mysql+pymysql://val_user:strongpassword@127.0.0.1:3306/validation_db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # Session configuration

@@ -6,6 +6,7 @@ from app.repositories.log_repository import LogRepository
 from app.repositories.app_repository import AppRepository
 from app.services.validation_service import ValidationService
 from app.validators.event_validator import EventValidator
+from config.database import db
 
 
 class LogService:
@@ -52,21 +53,28 @@ class LogService:
         validation_rules = self.validation_service.get_event_rules(app_id, event_name)
         
         if not validation_rules:
-            # No validation rules - store as error
+            # No validation rules - apply permissive fallback validator (from beta2.py behavior)
+            overall_status, validation_results = self.event_validator.validate_unknown_event(event_name, payload)
+            # Store log entry with fallback results
             log_entry = self.log_repo.create(
                 app_id=app.id,
                 event_name=event_name,
                 payload=payload,
-                validation_status='error',
-                validation_results=[{
-                    'error': 'No validation rules found for this event'
-                }]
+                validation_status=overall_status,
+                validation_results=validation_results
             )
-            return True, {
-                'status': 'error',
-                'message': 'No validation rules found for this event',
-                'log_id': log_entry.id
-            }
+            
+            # Compute payload hash for deduplication (AFTER creating entry)
+            payload_hash = self.log_repo._compute_payload_hash(payload)
+            log_entry.payload_hash = payload_hash
+            db.session.commit()
+            
+            # Delete older duplicates, keep this new entry
+            self.log_repo.delete_duplicate_older_entries(
+                app.id, event_name, payload, keep_id=log_entry.id
+            )
+            
+            return True, log_entry.to_dict()
         
         # Convert validation rules to dict format
         rules_dict = [
@@ -85,7 +93,7 @@ class LogService:
                 event_name, payload, rules_dict
             )
         except Exception as e:
-            # Validation error
+            # Validation error - persist and return the stored log
             log_entry = self.log_repo.create(
                 app_id=app.id,
                 event_name=event_name,
@@ -93,11 +101,18 @@ class LogService:
                 validation_status='error',
                 validation_results=[{'error': str(e)}]
             )
-            return True, {
-                'status': 'error',
-                'message': f'Validation error: {str(e)}',
-                'log_id': log_entry.id
-            }
+            
+            # Compute payload hash for deduplication (AFTER creating entry)
+            payload_hash = self.log_repo._compute_payload_hash(payload)
+            log_entry.payload_hash = payload_hash
+            db.session.commit()
+            
+            # Delete older duplicates, keep this new entry
+            self.log_repo.delete_duplicate_older_entries(
+                app.id, event_name, payload, keep_id=log_entry.id
+            )
+            
+            return True, log_entry.to_dict()
         
         # Store log entry
         log_entry = self.log_repo.create(
@@ -108,11 +123,19 @@ class LogService:
             validation_results=validation_results
         )
         
-        return True, {
-            'status': overall_status,
-            'log_id': log_entry.id,
-            'validation_results': validation_results
-        }
+        # Compute payload hash for deduplication (AFTER creating entry)
+        payload_hash = self.log_repo._compute_payload_hash(payload)
+        log_entry.payload_hash = payload_hash
+        db.session.commit()
+        
+        # Delete older duplicates, keep this new entry
+        self.log_repo.delete_duplicate_older_entries(
+            app.id, event_name, payload, keep_id=log_entry.id
+        )
+        
+        # Return the full stored log entry dictionary so callers (and WebSocket emits)
+        # have access to event_name, payload, validation_results and created_at
+        return True, log_entry.to_dict()
     
     def get_app_logs(self, app_id: str, limit: int = 100) -> List[LogEntry]:
         """Get recent logs for an app."""
@@ -120,6 +143,16 @@ class LogService:
         if not app:
             return []
         return self.log_repo.get_by_app(app.id, limit)
+    
+    def get_app_logs_paginated(self, app_id: str, page: int = 1, limit: int = 50) -> Tuple[List[LogEntry], int]:
+        """Get paginated logs for an app.
+        
+        Returns: (logs, total_count)
+        """
+        app = self.app_repo.get_by_app_id(app_id)
+        if not app:
+            return [], 0
+        return self.log_repo.get_by_app_paginated(app.id, page, limit)
     
     def get_validation_stats(self, app_id: str, hours: int = 24) -> Dict[str, Any]:
         """Get validation statistics for an app."""
@@ -134,3 +167,18 @@ class LogService:
         if not app:
             return []
         return self.log_repo.get_recent_logs(app.id, hours, limit)
+
+    def delete_all_logs(self, app_id: str) -> Tuple[bool, int]:
+        """Delete all logs for an app. Returns (success, deleted_count)."""
+        app = self.app_repo.get_by_app_id(app_id)
+        if not app:
+            return False, 0
+        deleted = self.log_repo.delete_all_by_app(app.id)
+        return True, deleted
+    
+    def get_distinct_event_names(self, app_id: str) -> List[str]:
+        """Get distinct event names captured in logs for an app."""
+        app = self.app_repo.get_by_app_id(app_id)
+        if not app:
+            return []
+        return self.log_repo.get_distinct_event_names(app.id)

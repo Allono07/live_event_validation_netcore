@@ -12,6 +12,7 @@ class LogEntry(db.Model):
     app_id = db.Column(db.Integer, db.ForeignKey('apps.id'), nullable=False)
     event_name = db.Column(db.String(200), nullable=False, index=True)
     payload = db.Column(db.JSON, nullable=False)  # Raw payload data
+    payload_hash = db.Column(db.String(64), nullable=True, index=True)  # SHA256 hash for deduplication
     validation_status = db.Column(db.String(20), nullable=False, index=True)  # valid, invalid, error
     validation_results = db.Column(db.JSON, nullable=True)  # Detailed validation results
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)

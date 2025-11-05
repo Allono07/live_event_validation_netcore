@@ -135,7 +135,7 @@ class LogRepository(BaseRepository[LogEntry]):
         ).distinct().all()
         return [r[0] for r in results if r[0]]
     
-    def get_fully_valid_events(self, app_id: int, hours: int = 24) -> List[str]:
+    def get_fully_valid_events(self, app_id: int, hours: int = 48) -> List[str]:
         """Get list of events where the latest instance has all fields valid.
         
         Returns list of event names where:
@@ -281,3 +281,88 @@ class LogRepository(BaseRepository[LogEntry]):
         logs = query.offset(offset).limit(limit).all()
         
         return logs, total
+    
+    def filter_logs(self, app_id: int, filters: dict = None) -> List[dict]:
+        """Filter logs against database directly.
+        
+        Supports filtering by:
+        - event_names: list of event names to include
+        - field_names: list of field names to include
+        - validation_statuses: list of validation statuses to include
+        - expected_types: list of expected types to include
+        - received_types: list of received types to include
+        - value_search: string to search in payload values (case-insensitive)
+        
+        Returns: List of validation result dicts matching all criteria
+        """
+        if not filters:
+            filters = {}
+        
+        # Start with all logs for this app
+        logs = self.model.query.filter_by(app_id=app_id)\
+            .order_by(LogEntry.created_at.desc()).all()
+        
+        results = []
+        
+        # Process each log
+        for log in logs:
+            if not log.validation_results or not isinstance(log.validation_results, list):
+                continue
+            
+            timestamp = log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else ''
+            event_name = log.event_name or ''
+            
+            # Check each validation result in the log
+            for result in log.validation_results:
+                field_name = result.get('key', '')
+                value = result.get('value', '')
+                expected_type = result.get('expectedType', '')
+                received_type = result.get('receivedType', '')
+                validation_status = result.get('validationStatus', '')
+                
+                # Apply filters (all must match - AND logic)
+                
+                # Filter by event names
+                event_names = filters.get('event_names', [])
+                if event_names and event_name not in event_names:
+                    continue
+                
+                # Filter by field names
+                field_names = filters.get('field_names', [])
+                if field_names and field_name not in field_names:
+                    continue
+                
+                # Filter by validation statuses
+                statuses = filters.get('validation_statuses', [])
+                if statuses and validation_status not in statuses:
+                    continue
+                
+                # Filter by expected types
+                expected_types = filters.get('expected_types', [])
+                if expected_types and expected_type not in expected_types:
+                    continue
+                
+                # Filter by received types
+                received_types = filters.get('received_types', [])
+                if received_types and received_type not in received_types:
+                    continue
+                
+                # Filter by value search (substring search, case-insensitive)
+                value_search = filters.get('value_search', '').strip().lower()
+                if value_search:
+                    if not str(value).lower().find(value_search) >= 0:
+                        continue
+                
+                # All filters passed, add to results
+                results.append({
+                    'timestamp': timestamp,
+                    'eventName': event_name,
+                    'key': field_name,
+                    'value': value,
+                    'expectedType': expected_type,
+                    'receivedType': received_type,
+                    'validationStatus': validation_status,
+                    'comment': result.get('comment', '')
+                })
+        
+        return results

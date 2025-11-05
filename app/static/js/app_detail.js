@@ -539,110 +539,125 @@ function updateCoverage() {
 }
 
 // Apply filters based on per-column selects/inputs placed in the table header
+// NOW uses server-side filtering to search entire database, not just cached 50 events
 function applyFilters() {
     // Get all checked event checkboxes
     const eventContainer = document.getElementById('filterEventContainer');
-    const selectedEvents = new Set();
+    const selectedEvents = [];
     if (eventContainer) {
         const checked = eventContainer.querySelectorAll('input[type="checkbox"]:checked');
-        checked.forEach(cb => selectedEvents.add(cb.value));
+        checked.forEach(cb => selectedEvents.push(cb.value));
     }
 
     // Get all checked field checkboxes
     const fieldContainer = document.getElementById('filterFieldContainer');
-    const selectedFields = new Set();
+    const selectedFields = [];
     if (fieldContainer) {
         const checked = fieldContainer.querySelectorAll('input[type="checkbox"]:checked');
-        checked.forEach(cb => selectedFields.add(cb.value));
+        checked.forEach(cb => selectedFields.push(cb.value));
     }
 
     // Get all checked expected type checkboxes
     const expectedContainer = document.getElementById('filterExpectedContainer');
-    const selectedExpected = new Set();
+    const selectedExpected = [];
     if (expectedContainer) {
         const checked = expectedContainer.querySelectorAll('input[type="checkbox"]:checked');
-        checked.forEach(cb => selectedExpected.add(cb.value));
+        checked.forEach(cb => selectedExpected.push(cb.value));
     }
 
     // Get all checked received type checkboxes
     const receivedContainer = document.getElementById('filterReceivedContainer');
-    const selectedReceived = new Set();
+    const selectedReceived = [];
     if (receivedContainer) {
         const checked = receivedContainer.querySelectorAll('input[type="checkbox"]:checked');
-        checked.forEach(cb => selectedReceived.add(cb.value));
+        checked.forEach(cb => selectedReceived.push(cb.value));
     }
 
     // Get all checked status checkboxes
     const statusContainer = document.getElementById('filterStatusContainer');
-    const selectedStatus = new Set();
+    const selectedStatus = [];
     if (statusContainer) {
         const checked = statusContainer.querySelectorAll('input[type="checkbox"]:checked');
-        checked.forEach(cb => selectedStatus.add(cb.value));
+        checked.forEach(cb => selectedStatus.push(cb.value));
     }
 
     // Get value search input
     const valueInput = document.getElementById('filterValueInput');
-    const valueQ = valueInput && valueInput.value ? valueInput.value.trim().toLowerCase() : '';
+    const valueSearch = valueInput && valueInput.value ? valueInput.value.trim() : '';
 
-    // Filter results: OR logic within each column, AND between columns
-    currentFilteredResults = allValidationResults.filter(r => {
-        // Event name: if selections exist, must match one of them
-        if (selectedEvents.size > 0 && !selectedEvents.has(r.eventName)) return false;
-        // Field name: if selections exist, must match one of them
-        if (selectedFields.size > 0 && !selectedFields.has(r.key)) return false;
-        // Expected type: if selections exist, must match one of them
-        if (selectedExpected.size > 0 && !selectedExpected.has(r.expectedType)) return false;
-        // Received type: if selections exist, must match one of them
-        if (selectedReceived.size > 0 && !selectedReceived.has(r.receivedType)) return false;
-        // Status: if selections exist, must match one of them
-        if (selectedStatus.size > 0 && !selectedStatus.has(r.validationStatus)) return false;
-        // Value search: if entered, value must include it
-        if (valueQ && !((r.value || '').toString().toLowerCase().includes(valueQ))) return false;
-        return true;
-    });
+    // Build filter payload for server
+    const filterPayload = {};
+    if (selectedEvents.length > 0) filterPayload.event_names = selectedEvents;
+    if (selectedFields.length > 0) filterPayload.field_names = selectedFields;
+    if (selectedExpected.length > 0) filterPayload.expected_types = selectedExpected;
+    if (selectedReceived.length > 0) filterPayload.received_types = selectedReceived;
+    if (selectedStatus.length > 0) filterPayload.validation_statuses = selectedStatus;
+    if (valueSearch) filterPayload.value_search = valueSearch;
 
-    // Re-render user table using currentFilteredResults
-    const userTable = document.getElementById('userLogsTable');
-    if (!userTable) return;
-    userTable.innerHTML = '';
+    // Call server-side filter endpoint
+    fetch(`/app/${APP_ID}/filter-logs`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(filterPayload)
+    })
+    .then(response => response.json())
+    .then(results => {
+        // Store filtered results from database
+        currentFilteredResults = results;
+        
+        // Re-render user table using server results
+        const userTable = document.getElementById('userLogsTable');
+        if (!userTable) return;
+        userTable.innerHTML = '';
 
-    const groups = {};
-    currentFilteredResults.forEach(r => {
-        // Group by event name AND timestamp for separate headers
-        const groupKey = `${r.eventName}|${r.timestamp}`;
-        if (!groups[groupKey]) groups[groupKey] = [];
-        groups[groupKey].push(r);
-    });
-
-    // Sort groups by timestamp (newest first)
-    const sortedKeys = Object.keys(groups).sort((a, b) => {
-        const tsA = a.split('|')[1] ? new Date(a.split('|')[1]) : new Date(0);
-        const tsB = b.split('|')[1] ? new Date(b.split('|')[1]) : new Date(0);
-        return tsB - tsA;
-    });
-
-    sortedKeys.forEach(groupKey => {
-        const [eventName, timestamp] = groupKey.split('|');
-        const header = document.createElement('tr');
-        header.className = 'event-header';
-        header.innerHTML = `<td colspan="1"><strong>${timestamp} \u00A0 ${eventName}</strong></td><td colspan="6"></td>`;
-        userTable.appendChild(header);
-
-        groups[groupKey].forEach(result => {
-            const row = document.createElement('tr');
-            row.className = 'event-field-row';
-            const statusClass = getStatusClass(result.validationStatus);
-            row.innerHTML = `
-                <td></td>
-                <td></td>
-                <td>${result.key || 'N/A'}</td>
-                <td>${result.value !== null && result.value !== undefined ? result.value : 'null'}</td>
-                <td>${result.expectedType || 'N/A'}</td>
-                <td>${result.receivedType || 'N/A'}</td>
-                <td class="${statusClass}">${result.validationStatus || 'Unknown'}</td>
-            `;
-            userTable.appendChild(row);
+        const groups = {};
+        currentFilteredResults.forEach(r => {
+            // Group by event name AND timestamp for separate headers
+            const groupKey = `${r.eventName}|${r.timestamp}`;
+            if (!groups[groupKey]) groups[groupKey] = [];
+            groups[groupKey].push(r);
         });
+
+        // Sort groups by timestamp (newest first)
+        const sortedKeys = Object.keys(groups).sort((a, b) => {
+            const tsA = a.split('|')[1] ? new Date(a.split('|')[1]) : new Date(0);
+            const tsB = b.split('|')[1] ? new Date(b.split('|')[1]) : new Date(0);
+            return tsB - tsA;
+        });
+
+        sortedKeys.forEach(groupKey => {
+            const [eventName, timestamp] = groupKey.split('|');
+            const header = document.createElement('tr');
+            header.className = 'event-header';
+            header.innerHTML = `<td colspan="1"><strong>${timestamp} \u00A0 ${eventName}</strong></td><td colspan="6"></td>`;
+            userTable.appendChild(header);
+
+            groups[groupKey].forEach(result => {
+                const row = document.createElement('tr');
+                row.className = 'event-field-row';
+                const statusClass = getStatusClass(result.validationStatus);
+                row.innerHTML = `
+                    <td></td>
+                    <td></td>
+                    <td>${result.key || 'N/A'}</td>
+                    <td>${result.value !== null && result.value !== undefined ? result.value : 'null'}</td>
+                    <td>${result.expectedType || 'N/A'}</td>
+                    <td>${result.receivedType || 'N/A'}</td>
+                    <td class="${statusClass}">${result.validationStatus || 'Unknown'}</td>
+                `;
+                userTable.appendChild(row);
+            });
+        });
+        
+        // Show result count
+        const resultCount = currentFilteredResults.length;
+        console.log(`Filter returned ${resultCount} results from database`);
+    })
+    .catch(error => {
+        console.error('Error applying filters:', error);
+        alert('Error applying filters: ' + error);
     });
 }
 

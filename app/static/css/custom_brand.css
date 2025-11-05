@@ -51,3 +51,46 @@
     color: #999 !important;
     font-style: italic !important;
 }
+
+/* Success Rate Card - Dark Purple */
+.success-rate-card {
+    background-color: #230f2e !important;
+    border-color: #230f2e !important;
+}
+
+/* All Buttons - Dark Purple */
+.btn-primary,
+.btn-success,
+.btn-danger,
+.btn-info {
+    background-color: #230f2e !important;
+    border-color: #230f2e !important;
+    color: #fff !important;
+}
+
+.btn-primary:hover,
+.btn-success:hover,
+.btn-danger:hover,
+.btn-info:hover {
+    background-color: #1a0820 !important;
+    border-color: #1a0820 !important;
+}
+
+.btn-primary:active,
+.btn-success:active,
+.btn-danger:active,
+.btn-info:active {
+    background-color: #0f0512 !important;
+    border-color: #0f0512 !important;
+}
+
+/* App Background - Light Orange */
+body {
+    background-color: #fde8d8 !important;
+    background: linear-gradient(135deg, #fde8d8 0%, #fff5f0 100%) !important;
+    min-height: 100vh;
+}
+
+.container {
+    background-color: transparent;
+}

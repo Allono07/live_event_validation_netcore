@@ -470,29 +470,76 @@ function updateLoadMoreButton() {
     }
 }
 
-// Download validation results
+// Download validation results for ALL unique latest events with current filters applied
 function downloadResults() {
-    if (allValidationResults.length === 0) {
-        alert('No validation results to download');
-        return;
+    // Get current filter values from UI checkboxes and inputs
+    
+    // Get selected events from checkboxes
+    const eventCheckboxes = document.querySelectorAll('#filterEventCheckboxes input[type="checkbox"]:checked');
+    const eventNames = Array.from(eventCheckboxes).map(cb => cb.value);
+    
+    // Get selected field names from checkboxes
+    const fieldCheckboxes = document.querySelectorAll('#filterFieldContainer input[type="checkbox"]:checked');
+    const fieldNames = Array.from(fieldCheckboxes).map(cb => cb.value);
+    
+    // Get selected expected types from checkboxes
+    const expectedCheckboxes = document.querySelectorAll('#filterExpectedContainer input[type="checkbox"]:checked');
+    const expectedTypes = Array.from(expectedCheckboxes).map(cb => cb.value);
+    
+    // Get selected received types from checkboxes
+    const receivedCheckboxes = document.querySelectorAll('#filterReceivedContainer input[type="checkbox"]:checked');
+    const receivedTypes = Array.from(receivedCheckboxes).map(cb => cb.value);
+    
+    // Get selected statuses from checkboxes
+    const statusCheckboxes = document.querySelectorAll('#filterStatusContainer input[type="checkbox"]:checked');
+    const validationStatuses = Array.from(statusCheckboxes).map(cb => cb.value);
+    
+    // Get value search input
+    const valueInput = document.getElementById('filterValueInput')?.value || '';
+    
+    // Build filters object to send to backend
+    const filters = {};
+    
+    if (eventNames.length > 0) {
+        filters.event_names = eventNames;
     }
-    const payloadResults = currentFilteredResults || allValidationResults;
-
-    fetch(`/app/${APP_ID}/download-report`, {
+    if (fieldNames.length > 0) {
+        filters.field_names = fieldNames;
+    }
+    if (validationStatuses.length > 0) {
+        filters.validation_statuses = validationStatuses;
+    }
+    if (expectedTypes.length > 0) {
+        filters.expected_types = expectedTypes;
+    }
+    if (receivedTypes.length > 0) {
+        filters.received_types = receivedTypes;
+    }
+    if (valueInput) {
+        filters.value_search = valueInput;
+    }
+    
+    // Call endpoint with filters applied
+    fetch(`/app/${APP_ID}/download-all-results`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            results: payloadResults
+            filters: filters
         })
     })
-    .then(response => response.blob())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Failed to download results');
+        }
+        return response.blob();
+    })
     .then(blob => {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `validation_results_${APP_ID}.csv`;
+        a.download = `validation_results_all_${APP_ID}.csv`;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
@@ -500,7 +547,7 @@ function downloadResults() {
     })
     .catch(error => {
         console.error('Error downloading results:', error);
-        alert('Error downloading results');
+        alert('Error downloading results: ' + error.message);
     });
 }
 

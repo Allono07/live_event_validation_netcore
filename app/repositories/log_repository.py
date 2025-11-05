@@ -366,3 +366,53 @@ class LogRepository(BaseRepository[LogEntry]):
                 })
         
         return results
+    
+    def get_all_latest_unique_events(self, app_id: int) -> List[dict]:
+        """Get validation results for the latest instance of each unique event.
+        
+        Returns all validation results for events ordered by most recent, including:
+        - eventName, key, value, expectedType, receivedType, validationStatus
+        
+        This is used for "Download All Results" feature to export all unique latest events.
+        """
+        # Get latest instance of each unique event
+        subquery = db.session.query(
+            func.max(LogEntry.id).label('latest_id')
+        ).filter(
+            LogEntry.app_id == app_id
+        ).group_by(LogEntry.event_name).subquery()
+        
+        latest_logs = db.session.query(LogEntry).filter(
+            LogEntry.id.in_(
+                db.session.query(subquery.c.latest_id)
+            )
+        ).order_by(LogEntry.created_at.desc()).all()
+        
+        results = []
+        
+        for log in latest_logs:
+            event_name = log.event_name
+            
+            # Process each validation result
+            if log.validation_results and isinstance(log.validation_results, list):
+                for result in log.validation_results:
+                    results.append({
+                        'eventName': event_name,
+                        'key': result.get('key', ''),
+                        'value': result.get('value', ''),
+                        'expectedType': result.get('expectedType', ''),
+                        'receivedType': result.get('receivedType', ''),
+                        'validationStatus': result.get('validationStatus', '')
+                    })
+            else:
+                # No validation results for this event
+                results.append({
+                    'eventName': event_name,
+                    'key': '',
+                    'value': '',
+                    'expectedType': '',
+                    'receivedType': '',
+                    'validationStatus': ''
+                })
+        
+        return results

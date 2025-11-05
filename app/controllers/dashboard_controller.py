@@ -439,6 +439,132 @@ def download_validation_report(app_id):
         return jsonify({'error': str(e)}), 500
 
 
+@dashboard_bp.route('/app/<app_id>/download-all-results', methods=['POST'])
+@login_required
+def download_all_results(app_id):
+    """Download validation results for ALL unique latest events as CSV.
+    
+    This endpoint exports all latest unique events from the database,
+    with optional filters applied.
+    
+    Expects JSON body with optional:
+    - filters: Dict with filter criteria (event_names, field_names, validation_statuses, etc.)
+    
+    Returns CSV with columns:
+    - eventName, key, value, expectedType, receivedType, validationStatus, comment
+    """
+    if not app_service.user_owns_app(current_user.id, app_id):
+        return jsonify({'error': 'Access denied'}), 403
+    
+    try:
+        # Get app
+        app = app_service.get_app_by_id(app_id)
+        if not app:
+            return jsonify({'error': 'App not found'}), 404
+        
+        # Get filters from request body
+        data = request.get_json() or {}
+        filters = data.get('filters', {})
+        
+        # Get all latest unique events from database
+        from app.repositories.log_repository import LogRepository
+        log_repo = LogRepository()
+        
+        all_results = log_repo.get_all_latest_unique_events(app.id)
+        
+        # Apply filters if provided
+        if filters:
+            filtered_results = []
+            
+            for result in all_results:
+                # Check event_names filter
+                if 'event_names' in filters and filters['event_names']:
+                    if result['eventName'] not in filters['event_names']:
+                        continue
+                
+                # Check field_names filter
+                if 'field_names' in filters and filters['field_names']:
+                    if result['key'] not in filters['field_names']:
+                        continue
+                
+                # Check validation_statuses filter
+                if 'validation_statuses' in filters and filters['validation_statuses']:
+                    if result['validationStatus'] not in filters['validation_statuses']:
+                        continue
+                
+                # Check expected_types filter
+                if 'expected_types' in filters and filters['expected_types']:
+                    if result['expectedType'] not in filters['expected_types']:
+                        continue
+                
+                # Check received_types filter
+                if 'received_types' in filters and filters['received_types']:
+                    if result['receivedType'] not in filters['received_types']:
+                        continue
+                
+                # Check value_search filter (case-insensitive substring match)
+                if 'value_search' in filters and filters['value_search']:
+                    search_term = str(filters['value_search']).lower()
+                    if search_term not in str(result['value']).lower():
+                        continue
+                
+                filtered_results.append(result)
+            
+            all_results = filtered_results
+        
+        if not all_results:
+            return jsonify({'error': 'No events found matching filters'}), 404
+        
+        # Create CSV content
+        output = io.StringIO()
+        fieldnames = ['eventName', 'key', 'value', 'expectedType', 'receivedType', 'validationStatus', 'comment']
+        writer = csv.DictWriter(output, fieldnames=fieldnames)
+        writer.writeheader()
+        
+        # Add comments to results
+        for result in all_results:
+            clean_result = {
+                'eventName': result.get('eventName', ''),
+                'key': result.get('key', ''),
+                'value': result.get('value', ''),
+                'expectedType': result.get('expectedType', ''),
+                'receivedType': result.get('receivedType', ''),
+                'validationStatus': result.get('validationStatus', ''),
+                'comment': result.get('comment', '')
+            }
+            
+            # Add comment if not present
+            if not clean_result['comment']:
+                status = clean_result['validationStatus']
+                if status == 'Valid':
+                    clean_result['comment'] = 'Field validation passed'
+                elif status == 'Invalid/Wrong datatype/value':
+                    clean_result['comment'] = f"Expected type: {clean_result['expectedType']}, Received type: {clean_result['receivedType']}"
+                elif status == 'Payload value is Empty':
+                    clean_result['comment'] = 'Field value is empty or null'
+                elif status == 'Extra key present in the log':
+                    clean_result['comment'] = 'This is an EXTRA payload or there is a spelling mistake with the required payload'
+                elif status == 'Payload not present in the log':
+                    clean_result['comment'] = 'Field is missing in the payload'
+                else:
+                    clean_result['comment'] = status
+            
+            writer.writerow(clean_result)
+        
+        # Create response
+        output.seek(0)
+        return Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={
+                'Content-Disposition': f'attachment; filename=validation_results_all_{app_id}.csv',
+                'Content-Type': 'text/csv; charset=utf-8'
+            }
+        )
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @dashboard_bp.route('/app/<app_id>/download-valid-events', methods=['POST'])
 @login_required
 def download_valid_events(app_id):

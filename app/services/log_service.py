@@ -197,3 +197,24 @@ class LogService:
         if not app:
             return []
         return self.log_repo.get_fully_valid_events(app.id, hours)
+    
+    def filter_logs(self, app_id: str, filters: Dict[str, Any] = None) -> List[Dict[str, Any]]:
+        """Filter logs against entire database with specified criteria.
+        
+        Args:
+            app_id: Application ID
+            filters: Dict with optional keys:
+                - event_names: list of event names to include
+                - field_names: list of field names to include
+                - validation_statuses: list of validation statuses to include
+                - expected_types: list of expected types to include
+                - received_types: list of received types to include
+                - value_search: string to search in payload values
+        
+        Returns:
+            List of validation result dicts matching all criteria
+        """
+        app = self.app_repo.get_by_app_id(app_id)
+        if not app:
+            return []
+        return self.log_repo.filter_logs(app.id, filters or {})

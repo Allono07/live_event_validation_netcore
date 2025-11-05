@@ -255,6 +255,52 @@ def get_fully_valid_events(app_id):
         return jsonify({'error': str(e)}), 500
 
 
+@dashboard_bp.route('/app/<app_id>/filter-logs', methods=['POST'])
+@login_required
+def filter_logs_database(app_id):
+    """Filter logs against entire database with specified criteria.
+    
+    This endpoint queries the database directly instead of filtering client-side cached results.
+    
+    Accepts JSON body with keys:
+    - event_names: list of event names to filter by (optional)
+    - field_names: list of field names to filter by (optional)
+    - validation_statuses: list of validation statuses to filter by (optional)
+    - expected_types: list of expected types to filter by (optional)
+    - received_types: list of received types to filter by (optional)
+    - value_search: string to search for in payload values (optional, case-insensitive)
+    
+    Returns: List of filtered validation result dicts
+    """
+    if not app_service.user_owns_app(current_user.id, app_id):
+        return jsonify({'error': 'Access denied'}), 403
+    
+    try:
+        data = request.get_json() or {}
+        
+        # Build filter dict
+        filters = {}
+        if data.get('event_names'):
+            filters['event_names'] = data['event_names']
+        if data.get('field_names'):
+            filters['field_names'] = data['field_names']
+        if data.get('validation_statuses'):
+            filters['validation_statuses'] = data['validation_statuses']
+        if data.get('expected_types'):
+            filters['expected_types'] = data['expected_types']
+        if data.get('received_types'):
+            filters['received_types'] = data['received_types']
+        if data.get('value_search'):
+            filters['value_search'] = data['value_search']
+        
+        # Query database
+        results = log_service.filter_logs(app_id, filters)
+        
+        return jsonify(results)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @dashboard_bp.route('/app/<app_id>/filter', methods=['POST', 'OPTIONS'])
 @login_required
 def filter_results(app_id):

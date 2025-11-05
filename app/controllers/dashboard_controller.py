@@ -583,3 +583,26 @@ def delete_all_logs(app_id):
         return jsonify({'error': 'App not found'}), 404
 
     return jsonify({'success': True, 'deleted': deleted})
+
+
+@dashboard_bp.route('/app/<app_id>', methods=['DELETE'])
+@login_required
+def delete_app(app_id):
+    """Delete an application and all its associated data.
+    
+    This will delete:
+    - The application itself
+    - All validation rules for this app
+    - All logs/events for this app
+    
+    Returns JSON: { success: true } or { success: false, error: "message" }
+    """
+    if not app_service.user_owns_app(current_user.id, app_id):
+        return jsonify({'success': False, 'error': 'Access denied'}), 403
+
+    success = app_service.delete_app(app_id)
+    if not success:
+        return jsonify({'success': False, 'error': 'App not found'}), 404
+
+    flash('Application deleted successfully', 'success')
+    return jsonify({'success': True})

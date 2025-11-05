@@ -2,6 +2,8 @@
 from typing import List, Optional
 from app.models.app import App
 from app.repositories.app_repository import AppRepository
+from app.repositories.validation_rule_repository import ValidationRuleRepository
+from app.repositories.log_repository import LogRepository
 import secrets
 
 
@@ -14,6 +16,8 @@ class AppService:
     def __init__(self, app_repo: AppRepository = None):
         """Initialize with dependency injection."""
         self.app_repo = app_repo or AppRepository()
+        self.validation_rule_repo = ValidationRuleRepository()
+        self.log_repo = LogRepository()
     
     def create_app(self, user_id: int, name: str, description: str = None, 
                    app_id: str = None) -> tuple:
@@ -77,12 +81,33 @@ class AppService:
         return app
     
     def delete_app(self, app_id: str) -> bool:
-        """Delete an app (soft delete by deactivating)."""
+        """Delete an app and all its associated data.
+        
+        This will delete:
+        - All validation rules for this app
+        - All logs/events for this app
+        - The application itself
+        
+        Returns: True if successful, False if app not found
+        """
         app = self.app_repo.get_by_app_id(app_id)
         if not app:
             return False
         
-        return self.app_repo.update(app.id, is_active=False) is not None
+        try:
+            # Delete all validation rules for this app
+            self.validation_rule_repo.delete_by_app(app.id)
+            
+            # Delete all logs for this app
+            self.log_repo.delete_all_by_app(app.id)
+            
+            # Delete the app itself
+            self.app_repo.delete(app.id)
+            
+            return True
+        except Exception as e:
+            print(f"Error deleting app {app_id}: {str(e)}")
+            return False
     
     def user_owns_app(self, user_id: int, app_id: str) -> bool:
         """Check if user owns the app."""

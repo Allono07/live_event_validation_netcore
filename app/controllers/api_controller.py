@@ -103,6 +103,11 @@ def receive_log(app_id):
             # Process the log
             success, result = log_service.process_log(app_id, formatted_data)
             
+            # Check if app not found - return 404 immediately
+            if not success and result.get('error') == 'App not found':
+                logger.warning(f"App not found for app_id: {app_id}")
+                return jsonify({'error': 'App not found'}), 404
+            
             if success:
                 logger.info(f"Validation PASSED for app_id: {app_id}, event: {event_name}")
                 

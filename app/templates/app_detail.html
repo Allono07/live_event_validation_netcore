@@ -198,13 +198,15 @@
                                         <th></th>
                                         <th>
                                             <div class="d-flex">
-                                                <input id="filterEventSearch" class="form-control form-control-sm me-1" placeholder="Search event..." />
                                                 <div class="dropdown">
                                                     <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" id="filterEventDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false">
                                                         Select events
                                                     </button>
-                                                    <div class="dropdown-menu p-2" aria-labelledby="filterEventDropdownBtn" style="max-height:200px;overflow:auto;" id="filterEventContainer">
-                                                        <!-- checkboxes populated here -->
+                                                    <div class="dropdown-menu p-2" aria-labelledby="filterEventDropdownBtn" style="width:250px;" id="filterEventContainer">
+                                                        <input type="text" class="form-control form-control-sm mb-2" id="filterEventSearch" placeholder="Search events..." style="display:none;" />
+                                                        <div id="filterEventCheckboxes" style="max-height:200px;overflow-y:auto;">
+                                                            <!-- checkboxes populated here -->
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>

@@ -32,3 +32,22 @@
     color: #ff9800;
     background: #2d2301;
 }
+
+/* Event filter dropdown search styling */
+#filterEventSearch {
+    border: 2px solid var(--brand-accent) !important;
+    padding: 0.4rem 0.6rem !important;
+    font-size: 0.875rem !important;
+    background-color: #f9f9f9 !important;
+}
+
+#filterEventSearch:focus {
+    border-color: var(--brand-primary) !important;
+    box-shadow: 0 0 0 0.2rem rgba(227, 85, 2, 0.25) !important;
+    background-color: #fff !important;
+}
+
+#filterEventSearch::placeholder {
+    color: #999 !important;
+    font-style: italic !important;
+}

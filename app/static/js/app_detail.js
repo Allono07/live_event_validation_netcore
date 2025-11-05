@@ -135,7 +135,15 @@ function getEventId(log) {
 // Helper function to fill checkbox container with checkboxes
 function fillCheckboxContainer(container, values, searchInputId = null) {
     if (!container) return;
-    container.innerHTML = '';
+    
+    // For event container, populate the nested checkboxes div instead
+    let targetContainer = container;
+    if (container.id === 'filterEventContainer') {
+        targetContainer = document.getElementById('filterEventCheckboxes');
+    }
+    
+    if (!targetContainer) return;
+    targetContainer.innerHTML = '';
     
     const sortedValues = Array.from(values).sort();
     
@@ -158,7 +166,7 @@ function fillCheckboxContainer(container, values, searchInputId = null) {
         
         checkDiv.appendChild(checkbox);
         checkDiv.appendChild(label);
-        container.appendChild(checkDiv);
+        targetContainer.appendChild(checkDiv);
     });
 }
 
@@ -166,9 +174,24 @@ function fillCheckboxContainer(container, values, searchInputId = null) {
 function attachEventSearchListener(searchInput, container) {
     if (!searchInput || !container) return;
     
+    // Show search input when it has focus or content
+    searchInput.addEventListener('focus', function() {
+        this.style.display = '';
+    });
+    
+    // Filter logic
     searchInput.addEventListener('input', function() {
         const q = this.value.trim().toLowerCase();
-        const checkboxes = container.querySelectorAll('.form-check');
+        
+        // For event container, search in the nested checkboxes div
+        let targetContainer = container;
+        if (container.id === 'filterEventContainer') {
+            targetContainer = document.getElementById('filterEventCheckboxes');
+        }
+        
+        if (!targetContainer) return;
+        
+        const checkboxes = targetContainer.querySelectorAll('.form-check');
         
         checkboxes.forEach(checkDiv => {
             const label = checkDiv.querySelector('label');
@@ -177,6 +200,17 @@ function attachEventSearchListener(searchInput, container) {
                 checkDiv.style.display = text.includes(q) ? '' : 'none';
             }
         });
+    });
+    
+    // Handle click outside or enter to close search
+    searchInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            this.value = '';
+            this.style.display = 'none';
+            // Reset filter
+            const event = new Event('input');
+            this.dispatchEvent(event);
+        }
     });
 }
 
@@ -729,6 +763,38 @@ document.addEventListener('DOMContentLoaded', function() {
     updateStats();
     loadInitialLogs();
     updateCoverage();
+    
+    // Setup search input toggle for event filter dropdown
+    const filterEventBtn = document.getElementById('filterEventDropdownBtn');
+    const filterEventSearch = document.getElementById('filterEventSearch');
+    if (filterEventBtn && filterEventSearch) {
+        // Show search input when dropdown is shown
+        filterEventBtn.addEventListener('click', function() {
+            // Bootstrap toggles the dropdown, so we need to check after a small delay
+            setTimeout(() => {
+                const isShown = document.getElementById('filterEventContainer').classList.contains('show');
+                if (isShown) {
+                    filterEventSearch.style.display = '';
+                    filterEventSearch.focus();
+                }
+            }, 0);
+        });
+        
+        // Also listen for dropdown shown event (Bootstrap event)
+        document.getElementById('filterEventContainer').addEventListener('shown.bs.dropdown', function() {
+            filterEventSearch.style.display = '';
+            filterEventSearch.focus();
+        });
+        
+        // Hide search when dropdown is hidden
+        document.getElementById('filterEventContainer').addEventListener('hidden.bs.dropdown', function() {
+            filterEventSearch.value = '';
+            filterEventSearch.style.display = 'none';
+            // Reset all checkbox visibility
+            const checkboxes = document.querySelectorAll('#filterEventCheckboxes .form-check');
+            checkboxes.forEach(checkbox => checkbox.style.display = '');
+        });
+    }
     
     // Refresh stats every 5 seconds
     setInterval(updateStats, 5000);

@@ -41,3 +41,43 @@ class ValidationRuleRepository(BaseRepository[ValidationRule]):
             app_id=app_id
         ).distinct().all()
         return [r[0] for r in results]
+    
+    def get_by_id(self, rule_id: int) -> ValidationRule:
+        """Get a validation rule by ID."""
+        return self.model.query.filter_by(id=rule_id).first()
+    
+    def update_rule(self, rule_id: int, **kwargs) -> ValidationRule:
+        """Update a validation rule."""
+        rule = self.get_by_id(rule_id)
+        if not rule:
+            return None
+        
+        # Update allowed fields
+        allowed_fields = ['event_name', 'field_name', 'data_type', 'is_required', 'expected_pattern', 'condition']
+        update_data = {k: v for k, v in kwargs.items() if k in allowed_fields}
+        
+        if update_data:
+            for key, value in update_data.items():
+                setattr(rule, key, value)
+            db.session.commit()
+        
+        return rule
+    
+    def delete_by_id(self, rule_id: int) -> bool:
+        """Delete a validation rule by ID. Returns True if successful."""
+        rule = self.get_by_id(rule_id)
+        if not rule:
+            return False
+        
+        db.session.delete(rule)
+        db.session.commit()
+        return True
+    
+    def delete_by_event(self, app_id: int, event_name: str) -> int:
+        """Delete all validation rules for a specific event. Returns count of deleted rules."""
+        count = self.model.query.filter_by(
+            app_id=app_id,
+            event_name=event_name.lower()
+        ).delete()
+        db.session.commit()
+        return count

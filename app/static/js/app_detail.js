@@ -899,3 +899,178 @@ document.addEventListener('DOMContentLoaded', function() {
     const loadMoreBtn = document.getElementById('loadMoreBtn');
     if (loadMoreBtn) loadMoreBtn.addEventListener('click', loadMoreLogs);
 });
+
+// ====================== VALIDATION RULES MANAGEMENT ======================
+
+// Edit a validation rule
+function editRule(ruleId, eventName, fieldName, dataType) {
+    document.getElementById('ruleId').value = ruleId;
+    document.getElementById('eventName').value = eventName;
+    document.getElementById('fieldName').value = fieldName;
+    document.getElementById('dataType').value = dataType;
+    document.getElementById('ruleModalTitle').textContent = 'Edit Validation Rule';
+    
+    const modal = new bootstrap.Modal(document.getElementById('addRuleModal'));
+    modal.show();
+}
+
+// Save a validation rule (create or update)
+function saveRule() {
+    const ruleId = document.getElementById('ruleId').value;
+    const eventName = document.getElementById('eventName').value.toLowerCase();
+    const fieldName = document.getElementById('fieldName').value;
+    const dataType = document.getElementById('dataType').value;
+    const isRequired = document.getElementById('isRequired').checked;
+    const expectedPattern = document.getElementById('expectedPattern').value;
+    
+    // Validate required fields
+    if (!eventName || !fieldName || !dataType) {
+        alert('Please fill in all required fields');
+        return;
+    }
+    
+    const payload = {
+        event_name: eventName,
+        field_name: fieldName,
+        data_type: dataType,
+        is_required: isRequired,
+        expected_pattern: expectedPattern || null
+    };
+    
+    const method = ruleId ? 'PUT' : 'POST';
+    const url = ruleId 
+        ? `/app/${APP_ID}/validation-rules/${ruleId}` 
+        : `/app/${APP_ID}/validation-rules`;
+    
+    fetch(url, {
+        method: method,
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            if (ruleId) {
+                // Update mode: reload and show success
+                alert('Rule updated successfully!');
+                bootstrap.Modal.getInstance(document.getElementById('addRuleModal')).hide();
+                location.reload();
+            } else {
+                // Create mode: insert row in correct position
+                const newRule = data.rule;
+                insertRuleIntoTable(newRule);
+                alert('Rule created successfully!');
+                bootstrap.Modal.getInstance(document.getElementById('addRuleModal')).hide();
+            }
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error saving rule:', error);
+        alert('Error saving rule: ' + error.message);
+    });
+}
+
+// Insert new rule into table at correct position (right after existing event rules)
+function insertRuleIntoTable(newRule) {
+    const table = document.getElementById('rulesTable');
+    if (!table) {
+        location.reload();
+        return;
+    }
+    
+    const tbody = table.querySelector('tbody');
+    if (!tbody) {
+        location.reload();
+        return;
+    }
+    
+    const rows = tbody.querySelectorAll('tr');
+    let insertPosition = tbody.children.length; // Default: append at end
+    let lastMatchIndex = -1; // Track the last row with matching event
+    
+    // Find ALL rows with the same event name and get the LAST one
+    const newRuleEventName = newRule.event_name.toLowerCase().trim();
+    
+    for (let i = 0; i < rows.length; i++) {
+        const currentEventName = rows[i].children[0].textContent.trim().toLowerCase();
+        
+        // If this row matches our event, update lastMatchIndex
+        if (currentEventName === newRuleEventName) {
+            lastMatchIndex = i;
+        }
+    }
+    
+    // If we found matching rows, insert after the last one
+    if (lastMatchIndex !== -1) {
+        insertPosition = lastMatchIndex + 1;
+    }
+    
+    // Create new table row
+    const newRow = document.createElement('tr');
+    newRow.setAttribute('data-rule-id', newRule.id);
+    newRow.innerHTML = `
+        <td>${newRule.event_name}</td>
+        <td>${newRule.field_name}</td>
+        <td>${newRule.data_type}</td>
+        <td>
+            <button class="btn btn-sm btn-outline-primary" onclick="editRule(${newRule.id}, '${newRule.event_name}', '${newRule.field_name}', '${newRule.data_type}')">Edit</button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteRule(${newRule.id})">Delete</button>
+        </td>
+    `;
+    
+    // Insert at the correct position
+    if (insertPosition >= tbody.children.length) {
+        tbody.appendChild(newRow);
+    } else {
+        tbody.insertBefore(newRow, tbody.children[insertPosition]);
+    }
+}
+
+// Delete a validation rule
+function deleteRule(ruleId) {
+    if (!confirm('Are you sure you want to delete this rule?')) {
+        return;
+    }
+    
+    fetch(`/app/${APP_ID}/validation-rules/${ruleId}`, {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Remove the row from table
+            const row = document.querySelector(`tr[data-rule-id="${ruleId}"]`);
+            if (row) {
+                row.remove();
+                alert('Rule deleted successfully!');
+            } else {
+                location.reload();
+            }
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error deleting rule:', error);
+        alert('Error deleting rule: ' + error.message);
+    });
+}
+
+// Reset modal when opening for new rule
+document.addEventListener('shown.bs.modal', function(e) {
+    if (e.target.id === 'addRuleModal') {
+        const ruleId = document.getElementById('ruleId').value;
+        if (!ruleId) {
+            // New rule mode - clear form
+            document.getElementById('ruleForm').reset();
+            document.getElementById('ruleModalTitle').textContent = 'Add Validation Rule';
+        }
+    }
+});

@@ -271,7 +271,7 @@ function populateFilterOptions() {
 }
 
 // Add new log entry to appropriate table
-function addLogToTable(log) {
+function addLogToTable(log, appendMode = false) {
     const isUser = isUserEvent(log);
     const tableId = isUser ? 'userLogsTable' : 'systemLogsTable';
     const table = document.getElementById(tableId);
@@ -330,8 +330,12 @@ function addLogToTable(log) {
             });
         });
 
-        // Prepend the fragment so the header + rows appear at top in correct order
-        table.insertBefore(frag, table.firstChild);
+        // Insert fragment at top for initial load, or append for load more
+        if (appendMode) {
+            table.appendChild(frag);
+        } else {
+            table.insertBefore(frag, table.firstChild);
+        }
 
         userEventsCount++;
         const userBadge = document.getElementById('userEventsCount');
@@ -354,7 +358,11 @@ function addLogToTable(log) {
             <td>${details}</td>
         `;
         
-        table.insertBefore(row, table.firstChild);
+        if (appendMode) {
+            table.appendChild(row);
+        } else {
+            table.insertBefore(row, table.firstChild);
+        }
         
         systemEventsCount++;
         const sysBadge = document.getElementById('systemEventsCount');
@@ -437,7 +445,7 @@ function loadMoreLogs() {
             data.logs.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
             data.logs.forEach(log => {
-                addLogToTable(log);
+                addLogToTable(log, true);  // Pass true for appendMode
             });
             
             // Update Load More button visibility

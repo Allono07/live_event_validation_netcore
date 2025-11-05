@@ -362,9 +362,9 @@ function addLogToTable(log) {
     }
     
     // Keep only last 200 entries per table (since we now have multiple rows per event)
-    while (table.children.length > 200) {
-        table.removeChild(table.lastChild);
-    }
+    // while (table.children.length > 200) {
+    //     table.removeChild(table.lastChild);
+    // }
     
     // Keep only last 1000 validation results in memory
     if (allValidationResults.length > 1000) {

@@ -1,6 +1,7 @@
 """API controller for receiving logs from mobile apps."""
 from flask import Blueprint, request, jsonify
 from app.services.log_service import LogService
+from app.services.app_service import AppService
 from app import socketio
 import logging
 import json
@@ -8,6 +9,7 @@ from datetime import datetime
 
 api_bp = Blueprint('api', __name__)
 log_service = LogService()
+app_service = AppService()
 
 # Configure logging
 logging.basicConfig(
@@ -34,6 +36,12 @@ def receive_log(app_id):
     2. Plain text with multiple "Event Payload: {...}" lines
     """
     try:
+        # Check if app exists; return 444 if not
+        app = app_service.get_app_by_id(app_id)
+        if not app:
+            logger.warning(f"Received request for non-existent app_id: {app_id}")
+            return jsonify({'error': 'App not found'}), 444
+
         content_type = request.content_type
         
         # Log incoming request

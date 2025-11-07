@@ -22,7 +22,18 @@ log_service = LogService()
 def index():
     """Main dashboard page."""
     apps = app_service.get_user_apps(current_user.id)
-    return render_template('dashboard.html', apps=apps)
+
+    # For each app compute the number of distinct custom events defined in the validation rules (CSV/sheet)
+    # i.e., count of unique event names present in the uploaded rules
+    custom_event_counts = {}
+    for a in apps:
+        try:
+            rule_event_names = validation_service.get_event_names(a.app_id)
+            custom_event_counts[a.app_id] = len(set(rule_event_names))
+        except Exception:
+            custom_event_counts[a.app_id] = 0
+
+    return render_template('dashboard.html', apps=apps, custom_event_counts=custom_event_counts)
 
 
 @dashboard_bp.route('/app/<app_id>')

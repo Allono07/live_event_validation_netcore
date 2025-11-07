@@ -43,7 +43,7 @@
                                     View Details
                                 </a>
                                 <div>
-                                    <span class="badge bg-secondary me-2">{{ app.validation_rules.count() }} rules</span>
+                                    <span class="badge bg-secondary me-2">{{ custom_event_counts.get(app.app_id, 0) }} events</span>
                                     <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#deleteAppModal" onclick="setDeleteAppId('{{ app.app_id }}', '{{ app.name }}')">
                                         Delete
                                     </button>

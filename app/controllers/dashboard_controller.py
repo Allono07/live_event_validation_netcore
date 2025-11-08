@@ -22,7 +22,18 @@ log_service = LogService()
 def index():
     """Main dashboard page."""
     apps = app_service.get_user_apps(current_user.id)
-    return render_template('dashboard.html', apps=apps)
+
+    # For each app compute the number of distinct custom events defined in the validation rules (CSV/sheet)
+    # i.e., count of unique event names present in the uploaded rules
+    custom_event_counts = {}
+    for a in apps:
+        try:
+            rule_event_names = validation_service.get_event_names(a.app_id)
+            custom_event_counts[a.app_id] = len(set(rule_event_names))
+        except Exception:
+            custom_event_counts[a.app_id] = 0
+
+    return render_template('dashboard.html', apps=apps, custom_event_counts=custom_event_counts)
 
 
 @dashboard_bp.route('/app/<app_id>')
@@ -732,3 +743,172 @@ def delete_app(app_id):
 
     flash('Application deleted successfully', 'success')
     return jsonify({'success': True})
+
+
+# ====================== VALIDATION RULES CRUD ENDPOINTS ======================
+
+@dashboard_bp.route('/app/<app_id>/validation-rules', methods=['GET'])
+@login_required
+def get_validation_rules(app_id):
+    """Get all validation rules for an app."""
+    if not app_service.user_owns_app(current_user.id, app_id):
+        return jsonify({'error': 'Access denied'}), 403
+    
+    try:
+        app = app_service.get_app_by_id(app_id)
+        if not app:
+            return jsonify({'error': 'App not found'}), 404
+        
+        from app.repositories.validation_rule_repository import ValidationRuleRepository
+        rule_repo = ValidationRuleRepository()
+        rules = rule_repo.get_by_app(app.id)
+        
+        return jsonify({
+            'success': True,
+            'rules': [rule.to_dict() for rule in rules]
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@dashboard_bp.route('/app/<app_id>/validation-rules', methods=['POST'])
+@login_required
+def create_validation_rule(app_id):
+    """Create a new validation rule."""
+    if not app_service.user_owns_app(current_user.id, app_id):
+        return jsonify({'error': 'Access denied'}), 403
+    
+    try:
+        app = app_service.get_app_by_id(app_id)
+        if not app:
+            return jsonify({'error': 'App not found'}), 404
+        
+        data = request.get_json()
+        
+        # Validate required fields
+        required_fields = ['event_name', 'field_name', 'data_type']
+        for field in required_fields:
+            if field not in data or not data[field]:
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+        
+        from app.repositories.validation_rule_repository import ValidationRuleRepository
+        rule_repo = ValidationRuleRepository()
+        
+        rule = rule_repo.create(
+            app_id=app.id,
+            event_name=data['event_name'].lower(),
+            field_name=data['field_name'],
+            data_type=data['data_type'],
+            is_required=data.get('is_required', False),
+            expected_pattern=data.get('expected_pattern'),
+            condition=data.get('condition')
+        )
+        
+        return jsonify({
+            'success': True,
+            'rule': rule.to_dict()
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@dashboard_bp.route('/app/<app_id>/validation-rules/<int:rule_id>', methods=['PUT'])
+@login_required
+def update_validation_rule(app_id, rule_id):
+    """Update an existing validation rule."""
+    if not app_service.user_owns_app(current_user.id, app_id):
+        return jsonify({'error': 'Access denied'}), 403
+    
+    try:
+        app = app_service.get_app_by_id(app_id)
+        if not app:
+            return jsonify({'error': 'App not found'}), 404
+        
+        from app.repositories.validation_rule_repository import ValidationRuleRepository
+        rule_repo = ValidationRuleRepository()
+        
+        rule = rule_repo.get_by_id(rule_id)
+        if not rule or rule.app_id != app.id:
+            return jsonify({'error': 'Rule not found'}), 404
+        
+        data = request.get_json()
+        
+        # Update allowed fields
+        update_data = {}
+        for field in ['event_name', 'field_name', 'data_type', 'is_required', 'expected_pattern', 'condition']:
+            if field in data:
+                if field == 'event_name':
+                    update_data[field] = data[field].lower()
+                else:
+                    update_data[field] = data[field]
+        
+        if not update_data:
+            return jsonify({'error': 'No fields to update'}), 400
+        
+        rule = rule_repo.update_rule(rule_id, **update_data)
+        
+        return jsonify({
+            'success': True,
+            'rule': rule.to_dict()
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@dashboard_bp.route('/app/<app_id>/validation-rules/<int:rule_id>', methods=['DELETE'])
+@login_required
+def delete_validation_rule(app_id, rule_id):
+    """Delete a validation rule."""
+    if not app_service.user_owns_app(current_user.id, app_id):
+        return jsonify({'error': 'Access denied'}), 403
+    
+    try:
+        app = app_service.get_app_by_id(app_id)
+        if not app:
+            return jsonify({'error': 'App not found'}), 404
+        
+        from app.repositories.validation_rule_repository import ValidationRuleRepository
+        rule_repo = ValidationRuleRepository()
+        
+        # Verify rule belongs to this app
+        rule = rule_repo.get_by_id(rule_id)
+        if not rule or rule.app_id != app.id:
+            return jsonify({'error': 'Rule not found'}), 404
+        
+        success = rule_repo.delete_by_id(rule_id)
+        
+        if not success:
+            return jsonify({'error': 'Failed to delete rule'}), 500
+        
+        return jsonify({
+            'success': True,
+            'message': 'Rule deleted successfully'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@dashboard_bp.route('/app/<app_id>/validation-rules/event/<event_name>', methods=['DELETE'])
+@login_required
+def delete_validation_rules_by_event(app_id, event_name):
+    """Delete all validation rules for a specific event."""
+    if not app_service.user_owns_app(current_user.id, app_id):
+        return jsonify({'error': 'Access denied'}), 403
+    
+    try:
+        app = app_service.get_app_by_id(app_id)
+        if not app:
+            return jsonify({'error': 'App not found'}), 404
+        
+        from app.repositories.validation_rule_repository import ValidationRuleRepository
+        rule_repo = ValidationRuleRepository()
+        
+        deleted_count = rule_repo.delete_by_event(app.id, event_name)
+        
+        return jsonify({
+            'success': True,
+            'deleted': deleted_count,
+            'message': f'Deleted {deleted_count} rule(s) for event: {event_name}'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

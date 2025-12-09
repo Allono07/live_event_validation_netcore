@@ -29,3 +29,7 @@ class UserRepository(BaseRepository[User]):
     def get_active_users(self):
         """Get all active users."""
         return self.model.query.filter_by(is_active=True).all()
+    
+    def create_user(self, email: str, username: str, password_hash: str) -> User:
+        """Create a new user with email, username, and hashed password."""
+        return self.create(email=email, username=username, password=password_hash, is_active=True)

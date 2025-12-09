@@ -64,14 +64,13 @@ class LogService:
                 validation_results=validation_results
             )
             
-            # Compute payload hash for deduplication (AFTER creating entry)
-            payload_hash = self.log_repo._compute_payload_hash(payload)
-            log_entry.payload_hash = payload_hash
+            # Commit the new entry first (timestamp-based deduplication)
             db.session.commit()
             
-            # Delete older duplicates, keep this new entry
+            # Delete older instances of this event, keep this new entry
+            # Uses timestamp-based deduplication: keeps only the latest by event_name
             self.log_repo.delete_duplicate_older_entries(
-                app.id, event_name, payload, keep_id=log_entry.id
+                app.id, event_name, keep_id=log_entry.id
             )
             
             return True, log_entry.to_dict()
@@ -102,14 +101,12 @@ class LogService:
                 validation_results=[{'error': str(e)}]
             )
             
-            # Compute payload hash for deduplication (AFTER creating entry)
-            payload_hash = self.log_repo._compute_payload_hash(payload)
-            log_entry.payload_hash = payload_hash
+            # Commit the new entry first (timestamp-based deduplication)
             db.session.commit()
             
-            # Delete older duplicates, keep this new entry
+            # Delete older instances of this event, keep this new entry
             self.log_repo.delete_duplicate_older_entries(
-                app.id, event_name, payload, keep_id=log_entry.id
+                app.id, event_name, keep_id=log_entry.id
             )
             
             return True, log_entry.to_dict()
@@ -123,14 +120,13 @@ class LogService:
             validation_results=validation_results
         )
         
-        # Compute payload hash for deduplication (AFTER creating entry)
-        payload_hash = self.log_repo._compute_payload_hash(payload)
-        log_entry.payload_hash = payload_hash
+        # Commit the new entry first (timestamp-based deduplication)
         db.session.commit()
         
-        # Delete older duplicates, keep this new entry
+        # Delete older instances of this event, keep this new entry
+        # Uses timestamp-based deduplication: keeps only the latest by event_name
         self.log_repo.delete_duplicate_older_entries(
-            app.id, event_name, payload, keep_id=log_entry.id
+            app.id, event_name, keep_id=log_entry.id
         )
         
         # Return the full stored log entry dictionary so callers (and WebSocket emits)

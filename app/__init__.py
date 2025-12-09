@@ -22,7 +22,7 @@ def create_app(config_name='development'):
     # Setup login manager
     login_manager = LoginManager()
     login_manager.init_app(app)
-    login_manager.login_view = 'auth.login'
+    login_manager.login_view = 'auth_email.login_email'
     
     @login_manager.user_loader
     def load_user(user_id):
@@ -30,20 +30,22 @@ def create_app(config_name='development'):
         return User.query.get(int(user_id))
     
     # Register blueprints
-    from app.controllers.auth_controller import auth_bp
+    from app.controllers.auth_email_controller import auth_bp as auth_email_bp
     from app.controllers.dashboard_controller import dashboard_bp
     from app.controllers.api_controller import api_bp
+    from app.controllers.push_notification_controller import push_bp
     
-    app.register_blueprint(auth_bp, url_prefix='/auth')
+    app.register_blueprint(auth_email_bp)  # Uses its own url_prefix='/auth'
     app.register_blueprint(dashboard_bp, url_prefix='/')
     app.register_blueprint(api_bp, url_prefix='/api')
+    app.register_blueprint(push_bp, url_prefix='/')
     
     # Import WebSocket handlers
     from app.controllers import websocket_controller
     
     # Initialize database tables
     with app.app_context():
-        from app.models import user, app as app_model, validation_rule, log_entry
+        from app.models import user, app as app_model, validation_rule, log_entry, fcm_token, firebase_credential, otp
         db.create_all()
     
     return app

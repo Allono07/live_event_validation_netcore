@@ -20,7 +20,12 @@
                     </button>
                 </p>
             </div>
-            <a href="{{ url_for('dashboard.index') }}" class="btn btn-secondary">← Back to Dashboard</a>
+            <div>
+                <a href="{{ url_for('push.index', app_id=app.app_id) }}" class="btn btn-outline-primary me-2">
+                    <i class="bi bi-bell"></i> Push Notifications
+                </a>
+                <a href="{{ url_for('dashboard.index') }}" class="btn btn-secondary">← Back to Dashboard</a>
+            </div>
         </div>
         
         {% with messages = get_flashed_messages(with_categories=true) %}

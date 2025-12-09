@@ -1,0 +1,426 @@
+{% extends "base.html" %}
+
+{% block title %}Push Notifications - {{ app.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800">Push Notifications</h1>
+            <p class="text-muted mb-0">App: {{ app.name }} ({{ app.app_id }})</p>
+        </div>
+        <a href="{{ url_for('dashboard.app_detail', app_id=app.app_id) }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+
+    <div class="row">
+        <!-- Left Column: Configuration & Sending -->
+        <div class="col-lg-8">
+            
+            <!-- Credentials Section -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 font-weight-bold text-primary">Firebase Credentials</h6>
+                    {% if has_credentials %}
+                        <span class="badge bg-success" id="credentials-badge">Configured</span>
+                    {% else %}
+                        <span class="badge bg-warning text-dark" id="credentials-badge">Not Configured</span>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    <!-- Upload State (shown when no credentials) -->
+                    <div id="upload-state">
+                        <form id="credentials-form" enctype="multipart/form-data">
+                            <div class="mb-3">
+                                <label for="credentials_file" class="form-label">Service Account JSON</label>
+                                <input type="file" class="form-control" id="credentials_file" name="credentials_file" accept=".json" required>
+                                <div class="form-text">Upload your Firebase Admin SDK private key JSON file.</div>
+                            </div>
+                            <button type="submit" class="btn btn-primary" id="upload-btn">
+                                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                                Upload & Validate
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Configured State (shown when credentials exist) -->
+                    <div id="configured-state" class="d-none">
+                        <div class="alert alert-success mb-3">
+                            <i class="bi bi-check-circle"></i>
+                            Firebase credentials are configured and ready to use.
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-warning" id="edit-creds-btn">
+                                <i class="bi bi-pencil"></i> Edit Credentials
+                            </button>
+                            <button type="button" class="btn btn-danger" id="delete-creds-btn">
+                                <i class="bi bi-trash"></i> Delete Credentials
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="credentials-alert" class="alert mt-3 d-none"></div>
+                </div>
+            </div>
+
+            <!-- Send Notification Section -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Send Notification</h6>
+                </div>
+                <div class="card-body">
+                    <form id="push-form">
+                        <!-- Device Token -->
+                        <div class="mb-3">
+                            <label for="fcm_token" class="form-label">FCM Device Token <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="fcm_token" placeholder="e.g., eW8C5Nx8u5I..." required>
+                                <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Recent</button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    {% for token in recent_tokens %}
+                                        <li><a class="dropdown-item token-select" href="#" data-token="{{ token }}">{{ token[:20] }}...</a></li>
+                                    {% else %}
+                                        <li><span class="dropdown-item text-muted">No recent tokens</span></li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Template Selection -->
+                        <div class="mb-3">
+                            <label for="template_type" class="form-label">Template Type <span class="text-danger">*</span></label>
+                            <select class="form-select" id="template_type" required>
+                                <option value="simple" selected>Simple Push Notification</option>
+                                <option value="rating">Rating Push Notification</option>
+                            </select>
+                        </div>
+
+                        <!-- Simple Template Fields -->
+                        <div id="simple-fields">
+                            <div class="mb-3">
+                                <label for="title" class="form-label">Title <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="title" placeholder="Notification Title">
+                            </div>
+                            <div class="mb-3">
+                                <label for="message" class="form-label">Message <span class="text-danger">*</span></label>
+                                <textarea class="form-control" id="message" rows="2" placeholder="Notification Message"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Common Fields -->
+                        <div class="mb-3">
+                            <label for="deeplink" class="form-label">Deep Link URL (Optional)</label>
+                            <input type="text" class="form-control" id="deeplink" placeholder="e.g., myapp://screen/product/123">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="image_link" class="form-label">Image URL (Optional)</label>
+                            <input type="url" class="form-control" id="image_link" placeholder="e.g., https://example.com/image.png">
+                            <div class="form-text">Providing an image will set type to "Image".</div>
+                        </div>
+
+                        <!-- Custom Payload -->
+                        <div class="mb-3">
+                            <label class="form-label">Custom Payload (Optional)</label>
+                            <div id="payload-container">
+                                <!-- Dynamic rows will be added here -->
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="add-payload-btn">
+                                <i class="bi bi-plus"></i> Add Key-Value Pair
+                            </button>
+                        </div>
+
+                        <button type="submit" class="btn btn-success w-100" id="send-btn">
+                            <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                            Send Notification
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Response & Logs -->
+        <div class="col-lg-4">
+            <!-- Response Card -->
+            <div class="card shadow mb-4 d-none" id="response-card">
+                <div class="card-header py-3 bg-success text-white">
+                    <h6 class="m-0 font-weight-bold">Last Response</h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-2">
+                        <strong>Status:</strong> <span class="badge bg-success">Sent Successfully</span>
+                    </div>
+                    <div class="mb-2">
+                        <strong>Message ID:</strong>
+                        <code class="d-block text-break" id="resp-msg-id"></code>
+                    </div>
+                    <div class="mb-2">
+                        <strong>Timestamp:</strong>
+                        <span id="resp-timestamp"></span>
+                    </div>
+                    <div class="mb-2">
+                        <strong>Template:</strong>
+                        <span id="resp-template" class="text-capitalize"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Error Card -->
+            <div class="card shadow mb-4 d-none" id="error-card">
+                <div class="card-header py-3 bg-danger text-white">
+                    <h6 class="m-0 font-weight-bold">Error</h6>
+                </div>
+                <div class="card-body text-danger" id="error-message">
+                </div>
+            </div>
+            
+            <!-- Info Card -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Information</h6>
+                </div>
+                <div class="card-body">
+                    <p class="small">
+                        <strong>Note:</strong> Notifications are sent as data-only messages to ensure delivery in all app states (foreground, background, killed).
+                    </p>
+                    <p class="small mb-0">
+                        <strong>Expiry:</strong> Automatically set to 30 days from now.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const APP_ID = "{{ app.app_id }}";
+    const HAS_CREDENTIALS = {% if has_credentials %}true{% else %}false{% endif %};
+    
+    function toggleCredentialsUI(hasCredentials) {
+        // Toggle between upload and configured UI
+        if (hasCredentials) {
+            $('#upload-state').addClass('d-none');
+            $('#configured-state').removeClass('d-none');
+            $('#credentials-badge').removeClass('bg-warning text-dark').addClass('bg-success').text('Configured');
+        } else {
+            $('#upload-state').removeClass('d-none');
+            $('#configured-state').addClass('d-none');
+            $('#credentials-badge').removeClass('bg-success').addClass('bg-warning text-dark').text('Not Configured');
+        }
+    }
+    
+    $(document).ready(function() {
+        // Initialize UI state
+        toggleCredentialsUI(HAS_CREDENTIALS);
+        
+        // Load saved data from localStorage
+        loadSavedData();
+
+        // Toggle fields based on template type
+        $('#template_type').change(function() {
+            if ($(this).val() === 'simple') {
+                $('#simple-fields').slideDown();
+                $('#title, #message').prop('required', true);
+            } else {
+                $('#simple-fields').slideUp();
+                $('#title, #message').prop('required', false);
+            }
+        });
+
+        // Add Payload Row
+        $('#add-payload-btn').click(function() {
+            addPayloadRow();
+        });
+
+        // Remove Payload Row
+        $(document).on('click', '.remove-payload', function() {
+            $(this).closest('.input-group').remove();
+            savePayloadData();
+        });
+
+        // Save payload on change
+        $(document).on('change', '.payload-key, .payload-val', function() {
+            savePayloadData();
+        });
+
+        // Token selection from dropdown
+        $('.token-select').click(function(e) {
+            e.preventDefault();
+            $('#fcm_token').val($(this).data('token'));
+            localStorage.setItem('fcm_token', $(this).data('token'));
+        });
+
+        // Save token on change
+        $('#fcm_token').change(function() {
+            localStorage.setItem('fcm_token', $(this).val());
+        });
+
+        // Upload Credentials
+        $('#credentials-form').submit(function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const btn = $('#upload-btn');
+            const alert = $('#credentials-alert');
+
+            btn.prop('disabled', true).find('.spinner-border').removeClass('d-none');
+            alert.addClass('d-none').removeClass('alert-success alert-danger');
+
+            $.ajax({
+                url: `/app/${APP_ID}/push-notifications/credentials`,
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(resp) {
+                    if (resp.valid) {
+                        alert.addClass('alert-success').text(resp.message).removeClass('d-none');
+                        toggleCredentialsUI(true);
+                        // Reset form
+                        $('#credentials-form')[0].reset();
+                    } else {
+                        alert.addClass('alert-danger').text(resp.message).removeClass('d-none');
+                    }
+                },
+                error: function(xhr) {
+                    alert.addClass('alert-danger').text(xhr.responseJSON?.message || 'Upload failed').removeClass('d-none');
+                },
+                complete: function() {
+                    btn.prop('disabled', false).find('.spinner-border').addClass('d-none');
+                }
+            });
+        });
+
+        // Edit Credentials
+        $('#edit-creds-btn').click(function() {
+            // Show the upload form again
+            toggleCredentialsUI(false);
+            // Scroll to the form
+            $('html, body').animate({
+                scrollTop: $('#upload-state').offset().top - 100
+            }, 300);
+        });
+
+        // Delete Credentials
+        $('#delete-creds-btn').click(function() {
+            if (confirm('Are you sure you want to delete the Firebase credentials? You will need to upload them again to send notifications.')) {
+                const btn = $(this);
+                btn.prop('disabled', true);
+
+                $.ajax({
+                    url: `/app/${APP_ID}/push-notifications/credentials`,
+                    type: 'DELETE',
+                    success: function(resp) {
+                        if (resp.success) {
+                            toggleCredentialsUI(false);
+                            const alert = $('#credentials-alert');
+                            alert.removeClass('d-none alert-danger').addClass('alert-success').text('Credentials deleted successfully');
+                            // Reset form
+                            $('#credentials-form')[0].reset();
+                        }
+                    },
+                    error: function(xhr) {
+                        const alert = $('#credentials-alert');
+                        alert.removeClass('d-none alert-success').addClass('alert-danger').text(xhr.responseJSON?.message || 'Delete failed');
+                    },
+                    complete: function() {
+                        btn.prop('disabled', false);
+                    }
+                });
+            }
+        });
+
+        // Send Notification
+        $('#push-form').submit(function(e) {
+            e.preventDefault();
+            const btn = $('#send-btn');
+            const errorCard = $('#error-card');
+            const responseCard = $('#response-card');
+
+            // Validate custom payload
+            const customPayload = getCustomPayload();
+            
+            const data = {
+                template_type: $('#template_type').val(),
+                fcm_token: $('#fcm_token').val(),
+                deeplink: $('#deeplink').val(),
+                image_link: $('#image_link').val(),
+                title: $('#title').val(),
+                message: $('#message').val(),
+                custom_payload: customPayload
+            };
+
+            btn.prop('disabled', true).find('.spinner-border').removeClass('d-none');
+            errorCard.addClass('d-none');
+            responseCard.addClass('d-none');
+
+            $.ajax({
+                url: `/app/${APP_ID}/push-notifications/send`,
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(data),
+                success: function(resp) {
+                    if (resp.success) {
+                        $('#resp-msg-id').text(resp.message_id);
+                        $('#resp-timestamp').text(new Date(resp.timestamp).toLocaleString());
+                        $('#resp-template').text(resp.template_type);
+                        responseCard.removeClass('d-none');
+                    }
+                },
+                error: function(xhr) {
+                    $('#error-message').text(xhr.responseJSON?.status || 'Failed to send notification');
+                    errorCard.removeClass('d-none');
+                },
+                complete: function() {
+                    btn.prop('disabled', false).find('.spinner-border').addClass('d-none');
+                }
+            });
+        });
+    });
+
+    function addPayloadRow(key = '', value = '') {
+        const html = `
+            <div class="input-group mb-2">
+                <input type="text" class="form-control payload-key" placeholder="Key" value="${key}" required>
+                <input type="text" class="form-control payload-val" placeholder="Value" value="${value}" required>
+                <button class="btn btn-outline-danger remove-payload" type="button"><i class="bi bi-trash"></i></button>
+            </div>
+        `;
+        $('#payload-container').append(html);
+    }
+
+    function getCustomPayload() {
+        const payload = {};
+        $('.payload-key').each(function(index) {
+            const key = $(this).val();
+            const val = $('.payload-val').eq(index).val();
+            if (key) payload[key] = val;
+        });
+        return payload;
+    }
+
+    function savePayloadData() {
+        const payload = getCustomPayload();
+        localStorage.setItem('fcm_custom_payload_pairs', JSON.stringify(payload));
+    }
+
+    function loadSavedData() {
+        // Load Token
+        const savedToken = localStorage.getItem('fcm_token');
+        if (savedToken) $('#fcm_token').val(savedToken);
+
+        // Load Payload
+        const savedPayload = localStorage.getItem('fcm_custom_payload_pairs');
+        if (savedPayload) {
+            try {
+                const payload = JSON.parse(savedPayload);
+                Object.entries(payload).forEach(([key, val]) => addPayloadRow(key, val));
+            } catch (e) {
+                console.error('Error parsing saved payload', e);
+            }
+        }
+    }
+</script>
+{% endblock %}

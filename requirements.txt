@@ -13,3 +13,4 @@ python-dotenv==1.0.0
 eventlet==0.33.3
 pandas==2.1.4
 gunicorn==21.2.0
+firebase-admin==6.2.0

@@ -33,17 +33,19 @@ def create_app(config_name='development'):
     from app.controllers.auth_controller import auth_bp
     from app.controllers.dashboard_controller import dashboard_bp
     from app.controllers.api_controller import api_bp
+    from app.controllers.push_notification_controller import push_bp
     
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(dashboard_bp, url_prefix='/')
     app.register_blueprint(api_bp, url_prefix='/api')
+    app.register_blueprint(push_bp, url_prefix='/')
     
     # Import WebSocket handlers
     from app.controllers import websocket_controller
     
     # Initialize database tables
     with app.app_context():
-        from app.models import user, app as app_model, validation_rule, log_entry
+        from app.models import user, app as app_model, validation_rule, log_entry, fcm_token, firebase_credential
         db.create_all()
     
     return app

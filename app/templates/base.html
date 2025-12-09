@@ -28,9 +28,9 @@
             <div>
                 {% if current_user and current_user.is_authenticated %}
                     <span class="text-light me-3">Welcome, {{ current_user.username }}</span>
-                    <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-light btn-sm">Logout</a>
+                    <a href="{{ url_for('auth_email.logout') }}" class="btn btn-outline-light btn-sm">Logout</a>
                 {% else %}
-                    <a href="{{ url_for('auth.login') }}" class="btn btn-outline-light btn-sm">Login</a>
+                    <a href="{{ url_for('auth_email.login_email') }}" class="btn btn-outline-light btn-sm">Login</a>
                 {% endif %}
             </div>
         </div>

@@ -25,6 +25,21 @@ class Config:
     
     # CORS
     CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '*')
+    
+    # Email configuration
+    MAIL_SERVER = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+    MAIL_PORT = int(os.environ.get('MAIL_PORT', 587))
+    MAIL_USE_TLS = os.environ.get('MAIL_USE_TLS', True)
+    MAIL_USERNAME = os.environ.get('MAIL_USERNAME', '')
+    MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD', '')
+    MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER', 'noreply@validation.app')
+    
+    # JWT configuration
+    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'jwt-secret-key-change-in-production')
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=1)
+    
+    # App settings
+    APP_URL = os.environ.get('APP_URL', 'http://localhost:5001')
 
 
 class DevelopmentConfig(Config):

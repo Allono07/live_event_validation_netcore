@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Register - Live Validation Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header text-white"
+                style="background-color: #230f2e; color: white;"
+                >
+                    <h3 class="m-0">Create Account</h3>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-4">Enter your email to get started. We'll send you a verification code.</p>
+                    
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+                    
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email Address</label>
+                            <input type="email" class="form-control" id="email" name="email" required 
+                                   placeholder="your@email.com">
+                            <small class="form-text text-muted">We'll never share your email.</small>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary w-100">
+                            Send Verification Code
+                        </button>
+                    </form>
+                    
+                    <hr>
+                    
+                    <p class="text-center text-muted small">
+                        Already have an account? 
+                        <a href="{{ url_for('auth_email.login_email') }}">Login here</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

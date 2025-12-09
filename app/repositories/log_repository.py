@@ -222,41 +222,36 @@ class LogRepository(BaseRepository[LogEntry]):
         # Compute SHA256 hash
         return sha256(payload_json.encode()).hexdigest()
     
-    def find_duplicate(self, app_id: int, event_name: str, payload: dict) -> Optional[LogEntry]:
-        """Find existing log entry with same payload hash.
+    def find_duplicate(self, app_id: int, event_name: str) -> Optional[LogEntry]:
+        """Find most recent log entry with same event_name (timestamp-based deduplication).
         
-        Returns the most recent entry with matching payload hash, or None if no match.
+        Returns the most recent entry with matching event_name, or None if no match.
+        This is used to find older instances of an event that should be deleted.
         """
-        payload_hash = self._compute_payload_hash(payload)
-        if not payload_hash:
-            return None
-        
         existing = self.model.query.filter_by(
             app_id=app_id,
-            event_name=event_name,
-            payload_hash=payload_hash
+            event_name=event_name
         ).order_by(LogEntry.created_at.desc()).first()
         
         return existing
     
-    def delete_duplicate_older_entries(self, app_id: int, event_name: str, 
-                                       payload: dict, keep_id: int) -> int:
-        """Delete all duplicate entries EXCEPT the one with keep_id.
+    def delete_duplicate_older_entries(self, app_id: int, event_name: str, keep_id: int) -> int:
+        """Delete all older instances of an event EXCEPT the one with keep_id.
         
-        Finds all entries with same payload hash and deletes older ones,
-        keeping only the entry with the specified keep_id.
+        Implements timestamp-based deduplication:
+        - Finds ALL entries with same event_name
+        - Keeps only the entry with the specified keep_id (newest)
+        - Deletes all older instances
+        
+        This approach works for both custom and system events.
+        Payload changes don't affect deduplication - only the event_name matters.
         
         Returns count of deleted entries.
         """
-        payload_hash = self._compute_payload_hash(payload)
-        if not payload_hash:
-            return 0
-        
-        # Find all entries with same payload hash EXCEPT keep_id
+        # Find all entries with same event_name EXCEPT keep_id
         duplicates = self.model.query.filter(
             LogEntry.app_id == app_id,
             LogEntry.event_name == event_name,
-            LogEntry.payload_hash == payload_hash,
             LogEntry.id != keep_id
         ).all()
         

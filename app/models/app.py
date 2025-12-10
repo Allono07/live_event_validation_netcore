@@ -16,6 +16,8 @@ class App(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     is_active = db.Column(db.Boolean, default=True)
+    platform = db.Column(db.String(50), default='android')
+    sdk_type = db.Column(db.String(50), default='ce')
     
     # Relationships
     validation_rules = db.relationship('ValidationRule', backref='app', lazy='dynamic', 
@@ -36,5 +38,7 @@ class App(db.Model):
             'user_id': self.user_id,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
-            'is_active': self.is_active
+            'is_active': self.is_active,
+            'platform': self.platform,
+            'sdk_type': self.sdk_type
         }

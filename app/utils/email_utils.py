@@ -24,11 +24,11 @@ def send_otp_email(email: str, otp: str) -> bool:
         True if successful, False otherwise
     """
     # In development mode, log OTP instead of sending email
-    is_dev = current_app.config.get('ENV') == 'development' or current_app.debug
+    is_dev = current_app.config.get('FLASK_ENV') == 'development'
     
-    if is_dev:
-        current_app.logger.warning(f"🔐 DEV MODE - OTP for {email}: {otp}")
-        return True
+    # if is_dev:
+    #     current_app.logger.warning(f"🔐 DEV MODE - OTP for {email}: {otp}")
+    #     return True
     
     try:
         msg = Message(
@@ -110,7 +110,7 @@ def send_password_reset_email(email: str, otp: str) -> bool:
         True if successful, False otherwise
     """
     # In development mode, log OTP instead of sending email
-    is_dev = current_app.config.get('ENV') == 'development' or current_app.debug
+    is_dev = current_app.config.get('FLASK_ENV') == 'development'
     
     if is_dev:
         current_app.logger.warning(f"🔐 DEV MODE - Password Reset OTP for {email}: {otp}")

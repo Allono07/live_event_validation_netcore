@@ -3,6 +3,7 @@ from flask import Blueprint, request, jsonify
 from app.services.log_service import LogService
 from app.services.app_service import AppService
 from app import socketio
+from app.tasks import process_event_async
 import logging
 import json
 from datetime import datetime
@@ -108,35 +109,53 @@ def receive_log(app_id):
             
             logger.info(f"Processing event: {event_name}")
             
-            # Process the log
-            success, result = log_service.process_log(app_id, formatted_data)
+            # Validate the event first (synchronous - fast)
+            success, validation_result = log_service.validate_log(app_id, formatted_data)
             
             # Check if app not found - return 404 immediately
-            if not success and result.get('error') == 'App not found':
+            if not success and validation_result.get('error') == 'App not found':
                 logger.warning(f"App not found for app_id: {app_id}")
                 return jsonify({'error': 'App not found'}), 404
             
+            # Queue event storage to Celery (async - non-blocking)
             if success:
-                logger.info(f"Validation PASSED for app_id: {app_id}, event: {event_name}")
-                
-                # Emit real-time update via WebSocket
-                socketio.emit('validation_update', {
-                    'app_id': app_id,
-                    'log': result
-                }, room=app_id)
-                
-                results.append(result)
+                validation_status = 'valid'
+                logger.info(f"✅ Validation PASSED for app_id: {app_id}, event: {event_name}")
             else:
-                logger.warning(f"Validation FAILED for app_id: {app_id}, event: {event_name}, error: {result}")
-                results.append(result)
+                validation_status = 'invalid'
+                logger.warning(f"⚠️  Validation FAILED for app_id: {app_id}, event: {event_name}")
+            
+            # Queue async task to store in database
+            task = process_event_async.delay(
+                app_id=app_id,
+                event_name=event_name,
+                payload=event_data,
+                validation_status=validation_status,
+                validation_results=validation_result.get('details')
+            )
+            
+            # Return immediately (202 Accepted) - don't wait for database write
+            results.append({
+                'event_name': event_name,
+                'status': validation_status,
+                'task_id': task.id,
+                'message': 'Event queued for processing'
+            })
+            
+            # Emit real-time update via WebSocket
+            socketio.emit('validation_update', {
+                'app_id': app_id,
+                'event': event_name,
+                'status': validation_status
+            }, room=app_id)
         
         logger.info(f"===========================")
         
-        # Return all results
+        # Return 202 Accepted - event queued for async processing
         if len(results) == 1:
-            return jsonify(results[0]), 200
+            return jsonify(results[0]), 202
         else:
-            return jsonify({'processed': len(results), 'results': results}), 200
+            return jsonify({'processed': len(results), 'results': results}), 202
             
     except Exception as e:
         logger.error(f"ERROR processing log for app_id: {app_id}, error: {str(e)}", exc_info=True)

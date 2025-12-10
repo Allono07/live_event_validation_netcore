@@ -1,4 +1,5 @@
 """Push Notification Controller."""
+import json
 from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for
 from flask_login import login_required, current_user
 from app.services.app_service import AppService
@@ -27,12 +28,22 @@ def index(app_id):
     recent_tokens = push_service.get_recent_tokens(app.id)
     
     # Check if credentials exist
-    has_credentials = FirebaseCredential.query.filter_by(app_id=app.id).first() is not None
+    credential = FirebaseCredential.query.filter_by(app_id=app.id).first()
+    has_credentials = credential is not None
+    project_id = None
+    
+    if has_credentials:
+        try:
+            creds_data = json.loads(credential.credentials_json)
+            project_id = creds_data.get('project_id')
+        except Exception:
+            pass
     
     return render_template('push_notifications.html', 
                            app=app, 
                            recent_tokens=recent_tokens,
-                           has_credentials=has_credentials)
+                           has_credentials=has_credentials,
+                           project_id=project_id)
 
 @push_bp.route('/app/<app_id>/push-notifications/credentials', methods=['POST'])
 @login_required
@@ -51,7 +62,16 @@ def upload_credentials(app_id):
     try:
         content = file.read().decode('utf-8')
         success, msg = push_service.save_credentials(app_id, content)
-        return jsonify({'valid': success, 'message': msg})
+        
+        project_id = None
+        if success:
+            try:
+                creds_data = json.loads(content)
+                project_id = creds_data.get('project_id')
+            except Exception:
+                pass
+                
+        return jsonify({'valid': success, 'message': msg, 'project_id': project_id})
     except Exception as e:
         return jsonify({'valid': False, 'message': str(e)}), 500
 

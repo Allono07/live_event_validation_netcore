@@ -31,12 +31,16 @@
                 {% for app in apps %}
                 <div class="col-md-6 mb-4">
                     <div class="card">
-                        <div class="card-body">
+                                                <div class="card-body">
                             <h5 class="card-title">{{ app.name }}</h5>
-                            <p class="card-text text-muted">{{ app.description or 'No description' }}</p>
-                            <p class="text-muted small">
-                                <strong>App ID:</strong> {{ app.app_id }}<br>
-                                <strong>Created:</strong> {{ app.created_at.strftime('%Y-%m-%d %H:%M') }}
+                            <h6 class="card-subtitle mb-2 text-muted">ID: {{ app.app_id }}</h6>
+                            <div class="mb-2">
+                                <span class="badge bg-info text-dark">{{ app.platform|default('android')|upper }}</span>
+                                <span class="badge bg-secondary">{{ app.sdk_type|default('ce')|upper }} SDK</span>
+                            </div>
+                            <p class="card-text text-truncate">{{ app.description or 'No description' }}</p>
+                            <p class="card-text">
+                                <small class="text-muted">Created: {{ app.created_at.strftime('%Y-%m-%d') }}</small>
                             </p>
                             <div class="d-flex justify-content-between">
                                 <a href="{{ url_for('dashboard.app_detail', app_id=app.app_id) }}" class="btn btn-primary btn-sm">
@@ -110,6 +114,25 @@
                             <input type="text" class="form-control" id="appId" name="app_id" placeholder="Leave empty to auto-generate">
                             <div class="form-text">You can paste a custom App ID or leave empty to auto-generate</div>
                         </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="platform" class="form-label">Platform</label>
+                                <select class="form-select" id="platform" name="platform">
+                                    <option value="android" selected>Android</option>
+                                    <option value="ios" disabled>iOS (Coming Soon)</option>
+                                    <option value="web" disabled>Web (Coming Soon)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="sdkType" class="form-label">SDK Type</label>
+                                <select class="form-select" id="sdkType" name="sdk_type">
+                                    <option value="ce" selected>CE SDK</option>
+                                    <option value="px" disabled>PX SDK (Coming Soon)</option>
+                                </select>
+                            </div>
+                        </div>
+
                         <div class="mb-3">
                             <label for="appDescription" class="form-label">Description</label>
                             <textarea class="form-control" id="appDescription" name="description" rows="3"></textarea>

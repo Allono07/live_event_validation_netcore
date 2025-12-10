@@ -1,15 +1,19 @@
 """Application entry point."""
 import sys
 import os
+from dotenv import load_dotenv
+
+# Load .env file BEFORE importing app
+load_dotenv()
+
 from app import create_app, socketio
 from config.database import db
 
 
-app = create_app()
-
-
 if __name__ == '__main__':
-    # Check for commands
+    app = create_app()
+    print(f"🗄️  Using database: {app.config['SQLALCHEMY_DATABASE_URI']}")
+    
     if len(sys.argv) > 1 and sys.argv[1] == 'init-db':
         print("Database tables already created during app initialization!")
         print("Database file: validation_dashboard.db")

@@ -19,6 +19,10 @@
                         <small>Copy ID</small>
                     </button>
                 </p>
+                <p class="mb-0 mt-1">
+                    <span class="badge bg-info text-dark">{{ app.platform|default('android')|upper }}</span>
+                    <span class="badge bg-secondary">{{ app.sdk_type|default('ce')|upper }} SDK</span>
+                </p>
             </div>
             <div>
                 <a href="{{ url_for('push.index', app_id=app.app_id) }}" class="btn btn-outline-primary me-2">

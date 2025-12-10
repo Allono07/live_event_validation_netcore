@@ -16,77 +16,70 @@ import os
 SQLITE_DB = 'instance/validation_dashboard.db'
 PG_CONFIG = {
     'dbname': os.getenv('PG_DBNAME', 'live_validation_dashboard'),
-    'user': os.getenv('PG_USER', 'dashboard_user'),
+    'user': os.getenv('PG_USER', 'postgres'),
     'password': os.getenv('PG_PASSWORD', 'secure_password'),
     'host': os.getenv('PG_HOST', 'localhost'),
     'port': os.getenv('PG_PORT', '5432'),
 }
 
-# Table definitions with proper type mappings
+# Table definitions matching SQLAlchemy models
 TABLES = {
     'users': {
-        'columns': ['id', 'email', 'username', 'password', 'is_active', 'created_at'],
+        'columns': ['id', 'username', 'password', 'email', 'created_at', 'updated_at', 'is_active'],
         'sql': '''
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
-                email VARCHAR(120) UNIQUE NOT NULL,
-                username VARCHAR(120) UNIQUE NOT NULL,
+                username VARCHAR(80) UNIQUE NOT NULL,
                 password VARCHAR(255) NOT NULL,
-                is_active BOOLEAN DEFAULT TRUE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                email VARCHAR(120) UNIQUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                is_active BOOLEAN DEFAULT TRUE
             )
         '''
     },
     'apps': {
-        'columns': ['id', 'user_id', 'name', 'description', 'api_key', 'created_at'],
+        'columns': ['id', 'app_id', 'name', 'description', 'user_id', 'created_at', 'updated_at', 'is_active'],
         'sql': '''
             CREATE TABLE IF NOT EXISTS apps (
                 id SERIAL PRIMARY KEY,
-                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                name VARCHAR(120) NOT NULL,
+                app_id VARCHAR(100) UNIQUE NOT NULL,
+                name VARCHAR(200) NOT NULL,
                 description TEXT,
-                api_key VARCHAR(255) UNIQUE NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                is_active BOOLEAN DEFAULT TRUE
             )
         '''
     },
     'validation_rules': {
-        'columns': ['id', 'app_id', 'field_name', 'rule_type', 'rule_value', 'created_at'],
+        'columns': ['id', 'app_id', 'event_name', 'field_name', 'data_type', 'is_required', 'expected_pattern', 'condition', 'created_at', 'updated_at'],
         'sql': '''
             CREATE TABLE IF NOT EXISTS validation_rules (
                 id SERIAL PRIMARY KEY,
                 app_id INTEGER NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
-                field_name VARCHAR(120) NOT NULL,
-                rule_type VARCHAR(50) NOT NULL,
-                rule_value VARCHAR(255),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                event_name VARCHAR(200) NOT NULL,
+                field_name VARCHAR(200) NOT NULL,
+                data_type VARCHAR(50) NOT NULL,
+                is_required BOOLEAN DEFAULT FALSE,
+                expected_pattern VARCHAR(500),
+                condition JSONB,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         '''
     },
     'log_entries': {
-        'columns': ['id', 'app_id', 'event_name', 'payload', 'is_valid', 'validation_errors', 'payload_hash', 'created_at'],
+        'columns': ['id', 'app_id', 'event_name', 'payload', 'is_valid', 'validation_errors', 'created_at'],
         'sql': '''
             CREATE TABLE IF NOT EXISTS log_entries (
                 id SERIAL PRIMARY KEY,
                 app_id INTEGER NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
-                event_name VARCHAR(120) NOT NULL,
+                event_name VARCHAR(200) NOT NULL,
                 payload JSONB NOT NULL,
                 is_valid BOOLEAN NOT NULL,
                 validation_errors JSONB,
-                payload_hash VARCHAR(64),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        '''
-    },
-    'otps': {
-        'columns': ['id', 'email', 'otp_hash', 'expires_at', 'is_used', 'created_at'],
-        'sql': '''
-            CREATE TABLE IF NOT EXISTS otps (
-                id SERIAL PRIMARY KEY,
-                email VARCHAR(120) NOT NULL,
-                otp_hash VARCHAR(255) NOT NULL,
-                expires_at TIMESTAMP NOT NULL,
-                is_used BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         '''
@@ -94,17 +87,18 @@ TABLES = {
 }
 
 INDEXES = [
+    'CREATE INDEX IF NOT EXISTS idx_user_username ON users(username)',
     'CREATE INDEX IF NOT EXISTS idx_user_email ON users(email)',
     'CREATE INDEX IF NOT EXISTS idx_user_active ON users(is_active)',
-    'CREATE INDEX IF NOT EXISTS idx_otp_email ON otps(email)',
-    'CREATE INDEX IF NOT EXISTS idx_otp_expires ON otps(expires_at)',
-    'CREATE INDEX IF NOT EXISTS idx_otp_used ON otps(is_used)',
     'CREATE INDEX IF NOT EXISTS idx_app_user ON apps(user_id)',
-    'CREATE INDEX IF NOT EXISTS idx_rule_app ON validation_rules(app_id)',
+    'CREATE INDEX IF NOT EXISTS idx_app_id ON apps(app_id)',
+    'CREATE INDEX IF NOT EXISTS idx_app_active ON apps(is_active)',
+    'CREATE INDEX IF NOT EXISTS idx_rule_app_event ON validation_rules(app_id, event_name)',
+    'CREATE INDEX IF NOT EXISTS idx_rule_event ON validation_rules(event_name)',
     'CREATE INDEX IF NOT EXISTS idx_log_app ON log_entries(app_id)',
-    'CREATE INDEX IF NOT EXISTS idx_log_date ON log_entries(created_at)',
     'CREATE INDEX IF NOT EXISTS idx_log_event ON log_entries(event_name)',
-    'CREATE INDEX IF NOT EXISTS idx_log_app_date ON log_entries(app_id, created_at DESC)',
+    'CREATE INDEX IF NOT EXISTS idx_log_created ON log_entries(created_at DESC)',
+    'CREATE INDEX IF NOT EXISTS idx_log_app_created ON log_entries(app_id, created_at DESC)',
 ]
 
 
@@ -170,11 +164,17 @@ def migrate_table(sqlite_conn, pg_conn, table_name):
     sqlite_cursor = sqlite_conn.cursor()
     pg_cursor = pg_conn.cursor()
     
+    # Define boolean columns for type conversion
+    boolean_columns = {
+        'users': ['is_active'],
+        'apps': ['is_active'],
+        'validation_rules': ['is_required'],
+        'log_entries': ['is_valid']
+    }
+    
     try:
-        # Get column info from SQLite
-        sqlite_cursor.execute(f"PRAGMA table_info({table_name})")
-        columns_info = sqlite_cursor.fetchall()
-        columns = [col[1] for col in columns_info]
+        # Use only the columns defined in TABLES
+        defined_columns = TABLES[table_name]['columns']
         
         # Get data from SQLite
         sqlite_cursor.execute(f"SELECT * FROM {table_name}")
@@ -184,15 +184,33 @@ def migrate_table(sqlite_conn, pg_conn, table_name):
             print(f"  ℹ️  No data to migrate for {table_name}")
             return 0
         
+        # Get column names from SQLite
+        sqlite_cursor.execute(f"PRAGMA table_info({table_name})")
+        columns_info = sqlite_cursor.fetchall()
+        sqlite_columns = {col[1]: col[0] for col in columns_info}  # name: index
+        
+        # Filter to only use defined columns that exist in SQLite
+        columns_to_use = [col for col in defined_columns if col in sqlite_columns]
+        
         # Insert into PostgreSQL
-        placeholders = ','.join(['%s'] * len(columns))
-        insert_sql = f"INSERT INTO {table_name} ({','.join(columns)}) VALUES ({placeholders})"
+        placeholders = ','.join(['%s'] * len(columns_to_use))
+        insert_sql = f"INSERT INTO {table_name} ({','.join(columns_to_use)}) VALUES ({placeholders})"
+        
+        # Get boolean columns for this table
+        bool_cols = boolean_columns.get(table_name, [])
         
         migrated = 0
         for row in rows:
             try:
-                row_data = tuple(row[col] for col in columns)
-                pg_cursor.execute(insert_sql, row_data)
+                row_data = []
+                for col in columns_to_use:
+                    val = row[sqlite_columns[col]]
+                    # Convert integer to boolean for boolean columns
+                    if col in bool_cols and isinstance(val, int):
+                        val = bool(val)
+                    row_data.append(val)
+                
+                pg_cursor.execute(insert_sql, tuple(row_data))
                 migrated += 1
             except Exception as e:
                 print(f"  ⚠️  Error inserting row into {table_name}: {e}")

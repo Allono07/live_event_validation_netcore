@@ -24,6 +24,64 @@ class LogService:
         self.validation_service = validation_service or ValidationService()
         self.event_validator = EventValidator()
     
+    def validate_log(self, app_id: str, log_data: Dict[str, Any]) -> Tuple[bool, Dict[str, Any]]:
+        """Validate log entry WITHOUT storing (async storage handled separately).
+        
+        Args:
+            app_id: Application ID
+            log_data: Log data containing event_name and payload
+            
+        Returns:
+            Tuple of (success, validation_result_dict)
+        """
+        # Get app
+        app = self.app_repo.get_by_app_id(app_id)
+        if not app:
+            return False, {'error': 'App not found'}
+        
+        # Extract event data
+        event_name = log_data.get('event_name') or log_data.get('eventName') or log_data.get('event')
+        payload = log_data.get('payload', {})
+        
+        if not event_name:
+            return False, {'error': 'Missing event_name in log data'}
+        
+        # Normalize event name
+        event_name = event_name.lower()
+        
+        # Get validation rules for this event
+        validation_rules = self.validation_service.get_event_rules(app_id, event_name)
+        
+        if not validation_rules:
+            # No validation rules - apply permissive fallback validator
+            overall_status, validation_results = self.event_validator.validate_unknown_event(event_name, payload)
+            return overall_status == 'valid', {
+                'status': overall_status,
+                'details': validation_results
+            }
+        
+        # Convert validation rules to dict format
+        rules_dict = [
+            {
+                'field_name': rule.field_name,
+                'data_type': rule.data_type,
+                'is_required': rule.is_required,
+                'expected_pattern': rule.expected_pattern,
+                'condition': rule.condition
+            }
+            for rule in validation_rules
+        ]
+        
+        # Validate payload
+        overall_status, validation_results = self.event_validator.validate_event(
+            event_name, payload, rules_dict
+        )
+        
+        return overall_status == 'valid', {
+            'status': overall_status,
+            'details': validation_results
+        }
+    
     def process_log(self, app_id: str, log_data: Dict[str, Any]) -> Tuple[bool, Dict[str, Any]]:
         """Process incoming log entry.
         

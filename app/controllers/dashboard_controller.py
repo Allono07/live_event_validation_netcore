@@ -77,6 +77,8 @@ def create_app():
     name = request.form.get('name')
     description = request.form.get('description', '')
     app_id = request.form.get('app_id', '').strip()  # Manual App ID input
+    platform = request.form.get('platform', 'android')
+    sdk_type = request.form.get('sdk_type', 'ce')
     
     if not name:
         flash('App name is required', 'danger')
@@ -86,7 +88,9 @@ def create_app():
         name=name,
         description=description,
         user_id=current_user.id,
-        app_id=app_id if app_id else None  # Use manual ID if provided
+        app_id=app_id if app_id else None,  # Use manual ID if provided
+        platform=platform,
+        sdk_type=sdk_type
     )
     
     if success:

@@ -20,7 +20,7 @@ class AppService:
         self.log_repo = LogRepository()
     
     def create_app(self, user_id: int, name: str, description: str = None, 
-                   app_id: str = None) -> tuple:
+                   app_id: str = None, platform: str = 'android', sdk_type: str = 'ce') -> tuple:
         """Create a new app.
         
         Args:
@@ -28,6 +28,8 @@ class AppService:
             name: App name
             description: Optional description
             app_id: Optional custom app ID (auto-generated if not provided)
+            platform: Platform (android, ios, web)
+            sdk_type: SDK Type (ce, px)
             
         Returns:
             Tuple of (success: bool, result: App or error message)
@@ -50,7 +52,9 @@ class AppService:
                 name=name,
                 description=description,
                 user_id=user_id,
-                is_active=True
+                is_active=True,
+                platform=platform,
+                sdk_type=sdk_type
             )
             
             return True, app

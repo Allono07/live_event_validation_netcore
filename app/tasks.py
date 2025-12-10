@@ -17,21 +17,26 @@ import json
 import hashlib
 from datetime import datetime
 
-# Initialize Celery with Redis broker from environment
+# Initialize Celery with Redis broker from environment ONLY
+# Do NOT use Flask app.config for Celery - it causes conflicts
+redis_url = os.environ.get('REDIS_URL') or os.environ.get('CELERY_BROKER_URL') or 'redis://localhost:6379/0'
 celery = Celery(__name__)
 celery.conf.update(
-    broker_url=os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0'),
-    result_backend=os.environ.get('CELERY_RESULT_BACKEND', 'redis://localhost:6379/1'),
+    broker_url=redis_url,
+    result_backend=redis_url.replace('/0', '/1') if redis_url.endswith('/0') else redis_url,
     task_serializer='json',
     accept_content=['json'],
     result_serializer='json',
     timezone='UTC',
     enable_utc=True,
 )
+print(f"🔵 Celery broker: {redis_url}")
 
 
 def init_celery(app):
     """Initialize Celery with Flask app context."""
+    # Only apply Flask config that doesn't conflict with Celery broker settings
+    # Skip CELERY_BROKER_URL and CELERY_RESULT_BACKEND to avoid overriding
     class ContextTask(celery.Task):
         """Make celery tasks work with Flask app context."""
         def __call__(self, *args, **kwargs):

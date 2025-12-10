@@ -28,11 +28,17 @@ class Config:
     
     # Email configuration
     MAIL_SERVER = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
-    MAIL_PORT = int(os.environ.get('MAIL_PORT', 587))
-    MAIL_USE_TLS = os.environ.get('MAIL_USE_TLS', True)
+    MAIL_PORT = int(os.environ.get('MAIL_PORT', 465))
+    MAIL_USE_TLS = os.environ.get('MAIL_USE_TLS', 'False').lower() == 'true'
+    MAIL_USE_SSL = os.environ.get('MAIL_USE_SSL', 'True').lower() == 'true'
     MAIL_USERNAME = os.environ.get('MAIL_USERNAME', '')
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD', '')
     MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER', 'noreply@validation.app')
+    MAIL_MAX_EMAILS = None
+    MAIL_SUPPRESS_SEND = False
+    MAIL_ASCII_ATTACHMENTS = False
+    # Delivery mode for emails/OTPs: 'send' or 'log'
+    OTP_DELIVERY_MODE = os.environ.get('OTP_DELIVERY_MODE', 'log')
     
     # JWT configuration
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'jwt-secret-key-change-in-production')
@@ -57,6 +63,8 @@ class DevelopmentConfig(Config):
     """Development configuration."""
     DEBUG = True
     FLASK_ENV = 'development'
+    # In development, do not send real emails
+    MAIL_SUPPRESS_SEND = True
 
 
 class ProductionConfig(Config):
@@ -71,6 +79,7 @@ class TestingConfig(Config):
     TESTING = True
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
     WTF_CSRF_ENABLED = False
+    MAIL_SUPPRESS_SEND = True
 
 
 config = {

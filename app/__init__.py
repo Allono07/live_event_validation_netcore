@@ -6,10 +6,6 @@ from config.database import db, init_db
 from app.utils.email_utils import mail, init_email
 import os
 
-# Set Celery broker from environment before importing tasks
-os.environ.setdefault('CELERY_BROKER_URL', 'redis://localhost:6379/0')
-os.environ.setdefault('CELERY_RESULT_BACKEND', 'redis://localhost:6379/1')
-
 from app.tasks import init_celery
 
 socketio = SocketIO()
@@ -28,7 +24,14 @@ def create_app(config_name='development'):
     
     # Initialize extensions
     db.init_app(app)
-    socketio.init_app(app, cors_allowed_origins="*", async_mode='threading')
+    # Configure Socket.IO
+    # Note: message_queue disabled due to eventlet DNS issues with Redis in Docker
+    # Live updates will not sync across workers, but core event processing works fine
+    socketio.init_app(
+        app,
+        cors_allowed_origins="*",
+        async_mode=os.environ.get('SOCKETIO_ASYNC_MODE', 'eventlet')
+    )
     init_email(app)
     
     # Initialize Celery

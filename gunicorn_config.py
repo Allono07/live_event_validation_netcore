@@ -8,10 +8,12 @@ import multiprocessing
 import os
 from pathlib import Path
 
-# Determine number of workers (CPU cores * 2 + 1)
+# Determine number of workers (CPU cores * 2 + 1), override with WEB_CONCURRENCY if set
 # For 500 req/min (8.3 req/sec avg), we recommend 4-8 workers minimum
 cpu_count = multiprocessing.cpu_count()
-workers = max(cpu_count * 2 + 1, 4)
+default_workers = max(cpu_count * 2 + 1, 4)
+workers = int(os.getenv('WEB_CONCURRENCY', default_workers))
+workers = max(workers, 1)
 
 # Server socket
 bind = os.getenv('GUNICORN_BIND', '127.0.0.1:8000')

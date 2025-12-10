@@ -9,9 +9,9 @@ load_dotenv()
 from app import create_app, socketio
 from config.database import db
 
+app = create_app()
 
 if __name__ == '__main__':
-    app = create_app()
     print(f"🗄️  Using database: {app.config['SQLALCHEMY_DATABASE_URI']}")
     
     if len(sys.argv) > 1 and sys.argv[1] == 'init-db':

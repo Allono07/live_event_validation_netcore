@@ -117,7 +117,7 @@ def receive_log(app_id):
                 logger.warning(f"App not found for app_id: {app_id}")
                 return jsonify({'error': 'App not found'}), 404
             
-            # Queue event storage to Celery (async - non-blocking)
+            # Queue event storage (sync for now - Celery causes AMQP connection issues)
             if success:
                 validation_status = 'valid'
                 logger.info(f"✅ Validation PASSED for app_id: {app_id}, event: {event_name}")
@@ -125,21 +125,30 @@ def receive_log(app_id):
                 validation_status = 'invalid'
                 logger.warning(f"⚠️  Validation FAILED for app_id: {app_id}, event: {event_name}")
             
-            # Queue async task to store in database
-            task = process_event_async.delay(
-                app_id=app_id,
-                event_name=event_name,
-                payload=event_data,
-                validation_status=validation_status,
-                validation_results=validation_result.get('details')
-            )
+            # Process event synchronously (Celery disabled for now)
+            task_id = None
+            message = 'Event processing'
+            try:
+                # Call task function directly (synchronous)
+                sync_result = process_event_async(
+                    app_id=app_id,
+                    event_name=event_name,
+                    payload=event_data,
+                    validation_status=validation_status,
+                    validation_results=validation_result.get('details')
+                )
+                logger.info(f"✅ Event processed: {sync_result.get('message')}")
+                message = sync_result.get('message', 'Event processed')
+            except Exception as e:
+                logger.error(f"❌ Error processing event: {str(e)[:100]}", exc_info=True)
+                message = f'Processing error: {type(e).__name__}'
             
-            # Return immediately (202 Accepted) - don't wait for database write
+            # Return immediately with result
             results.append({
                 'event_name': event_name,
                 'status': validation_status,
-                'task_id': task.id,
-                'message': 'Event queued for processing'
+                'task_id': task_id,
+                'message': message
             })
             
             # Emit real-time update via WebSocket

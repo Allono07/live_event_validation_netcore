@@ -38,7 +38,13 @@ function formatTimestamp(timestamp) {
 
 // Initialize WebSocket connection
 function initSocket() {
-    socket = io();
+    // Prefer WebSocket transport to avoid Engine.IO long-polling session issues across workers
+    socket = io({
+        transports: ['websocket'], // force WebSocket only
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000
+    });
     
     socket.on('connect', function() {
         console.log('Connected to validation server');

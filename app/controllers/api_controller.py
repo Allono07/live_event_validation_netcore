@@ -158,6 +158,7 @@ def receive_log(app_id):
                 'status': validation_status
             }, room=app_id)
         
+        
         logger.info(f"===========================")
         
         # Return 202 Accepted - event queued for async processing
@@ -168,6 +169,32 @@ def receive_log(app_id):
             
     except Exception as e:
         logger.error(f"ERROR processing log for app_id: {app_id}, error: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@api_bp.route('/logs/<app_id>/<int:log_id>', methods=['GET'])
+def get_log_detail(app_id, log_id):
+    """Retrieve full log details including raw payload and validation results."""
+    try:
+        log_data = log_service.get_log_by_id(app_id, log_id)
+        if not log_data:
+            return jsonify({'error': 'Log not found'}), 404
+        return jsonify(log_data), 200
+    except Exception as e:
+        logger.error(f"Error retrieving log {log_id}: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@api_bp.route('/logs/<app_id>/<int:log_id>', methods=['DELETE'])
+def delete_log(app_id, log_id):
+    """Delete a single log entry."""
+    try:
+        success, message = log_service.delete_log_by_id(app_id, log_id)
+        if not success:
+            return jsonify({'error': message}), 404
+        return jsonify({'success': True, 'message': message}), 200
+    except Exception as e:
+        logger.error(f"Error deleting log {log_id}: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 

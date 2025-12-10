@@ -293,7 +293,16 @@ function addLogToTable(log, appendMode = false) {
         header.className = 'event-header';
         header.innerHTML = `
             <td colspan="2"><strong>${timestamp} \u00A0 ${log.event_name || ''}</strong></td>
-            <td colspan="5"></td>
+            <td colspan="3">
+                <button class="btn btn-sm btn-primary" onclick="viewLogDetails(${log.id})">
+                    <i class="bi bi-eye"></i> View Log
+                </button>
+            </td>
+            <td colspan="2">
+                <button class="btn btn-sm btn-danger" onclick="deleteLogEntry(${log.id})">
+                    <i class="bi bi-trash"></i> Delete
+                </button>
+            </td>
         `;
         frag.appendChild(header);
 
@@ -1080,3 +1089,131 @@ document.addEventListener('shown.bs.modal', function(e) {
         }
     }
 });
+
+// View log details (raw JSON)
+function viewLogDetails(logId) {
+    fetch(`/api/logs/${APP_ID}/${logId}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Log not found');
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Display only the full payload (with event metadata at top)
+            const fullPayload = {
+                eventName: data.event_name,
+                eventTime: data.created_at,
+                ...data.payload
+            };
+            const jsonPre = document.getElementById('logJsonPre');
+            jsonPre.textContent = JSON.stringify(fullPayload, null, 2);
+            
+            // Update modal title
+            const modalLabel = document.getElementById('logDetailsLabel');
+            modalLabel.textContent = `Event Payload - ${data.event_name}`;
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('logDetailsModal'));
+            modal.show();
+        })
+        .catch(error => {
+            console.error('Error fetching log details:', error);
+            alert('Error loading log details: ' + error.message);
+        });
+}
+
+// Delete log entry
+function deleteLogEntry(logId) {
+    if (!confirm('Are you sure you want to delete this event log? This action cannot be undone.')) {
+        return;
+    }
+    
+    fetch(`/api/logs/${APP_ID}/${logId}`, {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Find and remove the row(s) associated with this log
+            const tableRows = document.querySelectorAll('tbody tr');
+            let rowsToRemove = [];
+            
+            // Find the header row with this log ID
+            tableRows.forEach((row, index) => {
+                if (row.classList.contains('event-header')) {
+                    // Check if there's a button with onclick containing this logId
+                    const buttons = row.querySelectorAll('button');
+                    for (let btn of buttons) {
+                        if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(`viewLogDetails(${logId})`) ||
+                            btn.getAttribute('onclick').includes(`deleteLogEntry(${logId})`)) {
+                            rowsToRemove.push(row);
+                            
+                            // Also remove all following field rows until we hit another header or end
+                            let nextIdx = index + 1;
+                            while (nextIdx < tableRows.length && !tableRows[nextIdx].classList.contains('event-header')) {
+                                rowsToRemove.push(tableRows[nextIdx]);
+                                nextIdx++;
+                            }
+                            break;
+                        }
+                    }
+                }
+            });
+            
+            // Remove rows
+            rowsToRemove.forEach(row => row.remove());
+            
+            // Update counts
+            if (rowsToRemove.length > 0) {
+                userEventsCount--;
+                document.getElementById('userEventsCount').textContent = userEventsCount;
+            }
+            
+            // Show success message
+            const toast = document.createElement('div');
+            toast.className = 'alert alert-success alert-dismissible fade show';
+            toast.setAttribute('role', 'alert');
+            toast.innerHTML = `
+                Event log deleted successfully.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            document.body.insertBefore(toast, document.body.firstChild);
+            
+            // Auto-dismiss after 3 seconds
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error deleting log:', error);
+        alert('Error deleting log: ' + error.message);
+    });
+}
+
+// Copy log JSON to clipboard
+function copyLogJsonToClipboard() {
+    const jsonPre = document.getElementById('logJsonPre');
+    const text = jsonPre.textContent;
+    
+    navigator.clipboard.writeText(text)
+        .then(() => {
+            // Show brief feedback
+            const btn = event.target;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="bi bi-check"></i> Copied!';
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+            }, 2000);
+        })
+        .catch(error => {
+            console.error('Error copying to clipboard:', error);
+            alert('Error copying to clipboard: ' + error.message);
+        });
+}

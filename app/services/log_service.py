@@ -1,5 +1,5 @@
 """Log processing service."""
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 from datetime import datetime
 from app.models.log_entry import LogEntry
 from app.repositories.log_repository import LogRepository
@@ -229,6 +229,55 @@ class LogService:
             return False, 0
         deleted = self.log_repo.delete_all_by_app(app.id)
         return True, deleted
+    
+    def delete_log_by_id(self, app_id: str, log_id: int) -> Tuple[bool, str]:
+        """Delete a single log entry by ID.
+        
+        Args:
+            app_id: Application ID (for verification)
+            log_id: Log entry ID to delete
+            
+        Returns:
+            (success, message)
+        """
+        app = self.app_repo.get_by_app_id(app_id)
+        if not app:
+            return False, "App not found"
+        
+        log = self.log_repo.get_by_id(log_id)
+        if not log or log.app_id != app.id:
+            return False, "Log not found"
+        
+        self.log_repo.delete(log_id)
+        return True, f"Log {log_id} deleted"
+    
+    def get_log_by_id(self, app_id: str, log_id: int) -> Optional[dict]:
+        """Retrieve a single log entry by ID with full details.
+        
+        Args:
+            app_id: Application ID (for verification)
+            log_id: Log entry ID
+            
+        Returns:
+            Dictionary with log details or None if not found
+        """
+        app = self.app_repo.get_by_app_id(app_id)
+        if not app:
+            return None
+        
+        log = self.log_repo.get_by_id(log_id)
+        if not log or log.app_id != app.id:
+            return None
+        
+        return {
+            'id': log.id,
+            'app_id': app_id,
+            'event_name': log.event_name,
+            'payload': log.payload,
+            'validation_status': log.validation_status,
+            'validation_results': log.validation_results,
+            'created_at': log.created_at.isoformat() if log.created_at else None
+        }
     
     def get_distinct_event_names(self, app_id: str) -> List[str]:
         """Get distinct event names captured in logs for an app."""

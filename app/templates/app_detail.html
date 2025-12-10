@@ -48,7 +48,7 @@
             <div class="col-md-3">
                 <div class="card bg-primary text-white">
                     <div class="card-body">
-                        <h6>Total User Events (eventId!=0)</h6>
+                        <h6>Total Events </h6>
                         <h3 id="totalLogs">0</h3>
                         <!-- <small>eventId!= 0</small> -->
                     </div>
@@ -453,6 +453,29 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="button" class="btn btn-primary" id="saveRuleBtn" onclick="saveRule()">Save Rule</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Log Details Modal -->
+    <div class="modal fade" id="logDetailsModal" tabindex="-1" aria-labelledby="logDetailsLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="logDetailsLabel">Log Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="logJsonContent" style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; max-height: 400px; overflow-y: auto;">
+                        <pre id="logJsonPre" style="margin: 0; white-space: pre-wrap; word-wrap: break-word;"></pre>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="copyLogJsonToClipboard()">
+                        <i class="bi bi-clipboard"></i> Copy JSON
+                    </button>
                 </div>
             </div>
         </div>

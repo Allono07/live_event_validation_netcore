@@ -2,13 +2,18 @@ version: '3.8'
 
 services:
   web:
+    sysctls:
+      net.ipv6.conf.all.disable_ipv6: "1"
+      net.ipv6.conf.default.disable_ipv6: "1"
     build: .
     container_name: validation_dashboard_web
     restart: always
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
-      - 1.1.1.1
+    # FIX: remove DNS overrides
+    # dns:
+    #   - 127.0.0.11
+    #   - 8.8.8.8
+    #   - 8.8.4.4
+    # dns_search: .
     env_file:
       - .env
     ports:
@@ -35,10 +40,12 @@ services:
     build: .
     container_name: validation_dashboard_worker
     restart: always
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
-      - 1.1.1.1
+    # FIX: remove DNS overrides
+    # dns:
+    #   - 127.0.0.11
+    #   - 8.8.8.8
+    #   - 8.8.4.4
+    # dns_search: .
     env_file:
       - .env
     command: celery -A celery_worker.celery worker --loglevel=info
@@ -89,9 +96,6 @@ services:
 networks:
   app-network:
     driver: bridge
-    driver_opts:
-      com.docker.network.bridge.enable_ip_masquerade: "true"
-      com.docker.network.driver.mtu: "1500"
 
 volumes:
   postgres_data:

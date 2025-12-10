@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: validation_dashboard_web
+    restart: always
+    ports:
+      - "5001:5000"
+    environment:
+      - FLASK_APP=run.py
+      - FLASK_ENV=production
+      - DATABASE_URL=postgresql://val_user:val_password@db:5432/validation_db
+      - REDIS_URL=redis://redis:6379/0
+      - SOCKETIO_MESSAGE_QUEUE=redis://redis:6379/0
+      - SECRET_KEY=prod-secret-key-change-this
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - ./uploads:/app/uploads
+      - ./instance:/app/instance
+    networks:
+      - app-network
+
+  worker:
+    build: .
+    container_name: validation_dashboard_worker
+    restart: always
+    command: celery -A celery_worker.celery worker --loglevel=info
+    environment:
+      - FLASK_APP=run.py
+      - FLASK_ENV=production
+      - DATABASE_URL=postgresql://val_user:val_password@db:5432/validation_db
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - app-network
+
+  db:
+    image: postgres:13-alpine
+    container_name: validation_dashboard_db
+    restart: always
+    environment:
+      - POSTGRES_USER=val_user
+      - POSTGRES_PASSWORD=val_password
+      - POSTGRES_DB=validation_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U val_user -d validation_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: validation_dashboard_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

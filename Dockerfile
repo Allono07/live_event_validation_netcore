@@ -1,11 +1,11 @@
 # Use an official Python runtime as a parent image
-FROM python:3.9-slim
+FROM python:3.11-slim
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV GUNICORN_BIND=0.0.0.0:5000
-ENV GUNICORN_WORKER_CLASS=eventlet
+ENV GUNICORN_WORKER_CLASS=gthread
 
 # Set work directory
 WORKDIR /app

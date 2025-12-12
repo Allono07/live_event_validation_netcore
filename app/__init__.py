@@ -25,10 +25,10 @@ def create_app(config_name='development'):
     # Initialize extensions
     db.init_app(app)
     # Configure Socket.IO
-    # Note: message_queue disabled due to eventlet DNS issues with Redis in Docker
-    # Live updates will not sync across workers, but core event processing works fine
+    # Enable message queue for horizontal scaling (Redis)
     socketio.init_app(
         app,
+        message_queue=app.config.get('SOCKETIO_MESSAGE_QUEUE'),
         cors_allowed_origins="*",
         async_mode=os.environ.get('SOCKETIO_ASYNC_MODE', 'eventlet')
     )

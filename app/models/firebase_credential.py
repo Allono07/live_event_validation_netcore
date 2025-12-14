@@ -15,7 +15,7 @@ class FirebaseCredential(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
-    app = db.relationship('App', backref='firebase_credential', uselist=False)
+    app = db.relationship('App', backref=db.backref('firebase_credential', cascade='all, delete-orphan', uselist=False))
     
     def __repr__(self):
         return f'<FirebaseCredential app_id={self.app_id}>'

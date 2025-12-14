@@ -20,7 +20,7 @@ bind = os.getenv('GUNICORN_BIND', '127.0.0.1:8000')
 backlog = 2048
 
 # Worker processes
-worker_class = os.getenv('GUNICORN_WORKER_CLASS', 'sync')
+worker_class = os.getenv('GUNICORN_WORKER_CLASS', 'gthread')
 worker_connections = int(os.getenv('GUNICORN_WORKER_CONNECTIONS', '1000'))
 timeout = int(os.getenv('GUNICORN_TIMEOUT', '60'))
 keepalive = int(os.getenv('GUNICORN_KEEPALIVE', '5'))

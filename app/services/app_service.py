@@ -84,7 +84,7 @@ class AppService:
         
         return app
     
-    def delete_app(self, app_id: str) -> bool:
+    def delete_app(self, app_id: str) -> tuple:
         """Delete an app and all its associated data.
         
         This will delete:
@@ -92,11 +92,11 @@ class AppService:
         - All logs/events for this app
         - The application itself
         
-        Returns: True if successful, False if app not found
+        Returns: (success: bool, error: str)
         """
         app = self.app_repo.get_by_app_id(app_id)
         if not app:
-            return False
+            return False, "App not found"
         
         try:
             # Delete all validation rules for this app
@@ -105,13 +105,13 @@ class AppService:
             # Delete all logs for this app
             self.log_repo.delete_all_by_app(app.id)
             
-            # Delete the app itself
+            # Delete the app itself (cascades to other relations)
             self.app_repo.delete(app.id)
             
-            return True
+            return True, None
         except Exception as e:
             print(f"Error deleting app {app_id}: {str(e)}")
-            return False
+            return False, str(e)
     
     def user_owns_app(self, user_id: int, app_id: str) -> bool:
         """Check if user owns the app."""

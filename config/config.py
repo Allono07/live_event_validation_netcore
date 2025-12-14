@@ -38,7 +38,7 @@ class Config:
     MAIL_SUPPRESS_SEND = False
     MAIL_ASCII_ATTACHMENTS = False
     # Delivery mode for emails/OTPs: 'send' or 'log'
-    OTP_DELIVERY_MODE = os.environ.get('OTP_DELIVERY_MODE', 'log')
+    OTP_DELIVERY_MODE = os.environ.get('OTP_DELIVERY_MODE', 'send')
     
     # JWT configuration
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'jwt-secret-key-change-in-production')
@@ -64,7 +64,7 @@ class DevelopmentConfig(Config):
     DEBUG = True
     FLASK_ENV = 'development'
     # In development, do not send real emails
-    MAIL_SUPPRESS_SEND = True
+    MAIL_SUPPRESS_SEND = False
 
 
 class ProductionConfig(Config):
@@ -79,7 +79,7 @@ class TestingConfig(Config):
     TESTING = True
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
     WTF_CSRF_ENABLED = False
-    MAIL_SUPPRESS_SEND = True
+    MAIL_SUPPRESS_SEND = False
 
 
 config = {

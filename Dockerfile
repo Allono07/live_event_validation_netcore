@@ -1,11 +1,11 @@
 # Use an official Python runtime as a parent image
-FROM python:3.9-slim
+FROM python:3.11-slim
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV GUNICORN_BIND=0.0.0.0:5000
-ENV GUNICORN_WORKER_CLASS=eventlet
+ENV GUNICORN_WORKER_CLASS=gthread
 
 # Set work directory
 WORKDIR /app
@@ -14,6 +14,8 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     gcc \
     libpq-dev \
+    libffi-dev \
+    libssl-dev \
     netcat-openbsd \
     curl \
     dnsutils \
@@ -22,7 +24,8 @@ RUN apt-get update && apt-get install -y \
 
 # Install python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir --default-timeout=100 -r requirements.txt
 
 # Copy project
 COPY . .

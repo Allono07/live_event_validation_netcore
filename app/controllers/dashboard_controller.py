@@ -741,9 +741,9 @@ def delete_app(app_id):
     if not app_service.user_owns_app(current_user.id, app_id):
         return jsonify({'success': False, 'error': 'Access denied'}), 403
 
-    success = app_service.delete_app(app_id)
+    success, error = app_service.delete_app(app_id)
     if not success:
-        return jsonify({'success': False, 'error': 'App not found'}), 404
+        return jsonify({'success': False, 'error': error or 'App not found'}), 404
 
     flash('Application deleted successfully', 'success')
     return jsonify({'success': True})

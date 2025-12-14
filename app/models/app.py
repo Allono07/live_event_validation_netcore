@@ -24,6 +24,8 @@ class App(db.Model):
                                       cascade='all, delete-orphan')
     log_entries = db.relationship('LogEntry', backref='app', lazy='dynamic',
                                  cascade='all, delete-orphan')
+    fcm_tokens = db.relationship('FCMToken', backref='app', lazy='dynamic',
+                                cascade='all, delete-orphan')
     
     def __repr__(self):
         return f'<App {self.app_id}: {self.name}>'

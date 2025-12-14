@@ -221,7 +221,7 @@ class AuthService:
             # Update password
             password_hash = hash_password(new_password)
             user.password = password_hash
-            self.user_repo.update(user)
+            self.user_repo.save(user)
             
             # Mark OTP as used
             self.otp_repo.mark_as_used(otp_record.id)

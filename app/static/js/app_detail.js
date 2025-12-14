@@ -106,11 +106,11 @@ function isUserEvent(log) {
             return (payload.eventId === 0 || payload.eventId === '0') || (payload.eventid === 0 || payload.eventid === '0');
         }
         
-        // Default to user event if eventId not found
-        return true;
+        // Default to system event if eventId not found
+        return false;
     } catch (e) {
         console.error('Error checking user event:', e);
-        return true;
+        return false;
     }
 }
 
@@ -371,6 +371,11 @@ function addLogToTable(log, appendMode = false) {
             <td>${log.event_name || ''}</td>
             <td><span class="badge bg-secondary">${eventId}</span></td>
             <td>${details}</td>
+          <td>
+    <button class="btn btn-sm btn-primary" onclick="viewLogDetails(${log.id})">
+        <i class="bi bi-eye"></i> View log
+    </button>
+</td>
         `;
         
         if (appendMode) {
